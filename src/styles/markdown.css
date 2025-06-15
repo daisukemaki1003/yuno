@@ -1,0 +1,86 @@
+/* マークダウン全体のベース */
+.markdown-body {
+  font-family: 'Noto Sans JP', 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+  color: #222;
+  line-height: 1.8;
+  font-size: 16px;
+}
+
+/* 見出し */
+.markdown-body h1 {
+  font-size: 1.7em;
+  font-weight: bold;
+  margin-top: 1.5em;
+  margin-bottom: 0.7em;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0.3em;
+}
+
+.markdown-body h2 {
+  font-size: 1.3em;
+  font-weight: bold;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0.2em;
+}
+
+/* 箇条書き */
+.markdown-body ul {
+  margin-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.markdown-body li {
+  margin-bottom: 0.3em;
+}
+
+/* ボックス（AI提案や警告） */
+.markdown-body blockquote {
+  background: #f0fdf4;
+  border-left: 4px solid #34d399;
+  border-radius: 8px;
+  padding: 1em 1.2em;
+  margin: 1.2em 0;
+  color: #166534;
+  font-size: 1em;
+}
+
+.markdown-body .alert {
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  color: #92400e;
+  border-radius: 6px;
+  padding: 0.8em 1em;
+  margin: 1em 0;
+  font-size: 0.98em;
+}
+
+/* 水平線 */
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 2em 0;
+}
+
+/* サンプルテキスト */
+.markdown-body p {
+  margin: 0.5em 0;
+}
+
+/* テーブル（もし使う場合） */
+.markdown-body table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: 100%;
+}
+
+.markdown-body th, .markdown-body td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5em 0.8em;
+}
+
+.markdown-body th {
+  background: #f3f4f6;
+  font-weight: bold;
+}
