@@ -1,86 +1,105 @@
-/* マークダウン全体のベース */
-.markdown-body {
-  font-family: 'Noto Sans JP', 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
-  color: #222;
-  line-height: 1.8;
-  font-size: 16px;
-}
+.markdown {
+  h2 {
+    color: #000;
+    font-family: "Noto Sans JP";
+    font-size: var(--font-size-editor-head-h3, 26px);
+    font-style: normal;
+    font-weight: 700;
+    line-height: 160%;
+    letter-spacing: 0.78px;
+  }
 
-/* 見出し */
-.markdown-body h1 {
-  font-size: 1.7em;
-  font-weight: bold;
-  margin-top: 1.5em;
-  margin-bottom: 0.7em;
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 0.3em;
-}
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: #222;
+    font-family: "Noto Sans JP";
+    font-size: var(--font-size-editor-head-h4, 22px);
+    font-style: normal;
+    font-weight: 700;
+    line-height: 160%;
+    /* 35.2px */
+  }
 
-.markdown-body h2 {
-  font-size: 1.3em;
-  font-weight: bold;
-  margin-top: 1.2em;
-  margin-bottom: 0.5em;
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 0.2em;
-}
+  p {
+    margin-top: 30px;
 
-/* 箇条書き */
-.markdown-body ul {
-  margin-left: 1.5em;
-  margin-bottom: 1em;
-}
+    color: #000;
+    text-align: justify;
+    font-family: "Noto Sans JP";
+    font-size: 17px;
+    font-style: normal;
+    font-weight: 400;
 
-.markdown-body li {
-  margin-bottom: 0.3em;
-}
 
-/* ボックス（AI提案や警告） */
-.markdown-body blockquote {
-  background: #f0fdf4;
-  border-left: 4px solid #34d399;
-  border-radius: 8px;
-  padding: 1em 1.2em;
-  margin: 1.2em 0;
-  color: #166534;
-  font-size: 1em;
-}
+    a {
+      color: #007EA4;
+      text-align: justify;
+      font-family: "Noto Sans JP";
+      font-size: var(--font-size-editor-list, 16px);
+      font-style: normal;
+      font-weight: 400;
+      line-height: 190%;
+      letter-spacing: 0.64px;
+      text-decoration-line: underline;
+      text-decoration-style: solid;
+      text-decoration-skip-ink: none;
+      text-decoration-thickness: auto;
+      text-underline-offset: auto;
+      text-underline-position: from-font;
+    }
+  }
 
-.markdown-body .alert {
-  background: #fef3c7;
-  border: 1px solid #fbbf24;
-  color: #92400e;
-  border-radius: 6px;
-  padding: 0.8em 1em;
-  margin: 1em 0;
-  font-size: 0.98em;
-}
+  ul {
+    margin-top: 60px;
 
-/* 水平線 */
-.markdown-body hr {
-  border: none;
-  border-top: 1px solid #e5e7eb;
-  margin: 2em 0;
-}
+    p {
+      margin-top: 0;
+    }
 
-/* サンプルテキスト */
-.markdown-body p {
-  margin: 0.5em 0;
-}
+    li {
+      margin-top: 10px;
+    }
 
-/* テーブル（もし使う場合） */
-.markdown-body table {
-  border-collapse: collapse;
-  margin: 1em 0;
-  width: 100%;
-}
+    >li {
+      position: relative;
+      padding-left: 20px;
 
-.markdown-body th, .markdown-body td {
-  border: 1px solid #e5e7eb;
-  padding: 0.5em 0.8em;
-}
+      &::before {
+        position: absolute;
+        top: 12px;
+        left: 4px;
+        content: "";
+        display: block;
+        background-color: #BAB8B3;
+        border-radius: 100%;
+        width: 6px;
+        height: 6px;
+      }
 
-.markdown-body th {
-  background: #f3f4f6;
-  font-weight: bold;
+      >ul {
+        margin-top: 0;
+
+        >li {
+          position: relative;
+          padding-left: 20px;
+
+          &::before {
+            position: absolute;
+            top: 12px;
+            left: 4px;
+            content: "";
+            display: block;
+            background-color: #fff;
+            border-radius: 100%;
+            width: 6px;
+            height: 6px;
+            border: 1px solid #BAB8B3;
+          }
+        }
+      }
+    }
+
+  }
 }

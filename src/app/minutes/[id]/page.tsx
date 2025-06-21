@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Header from "@/components/layout/Header/Header";
+import { MeetingNote } from "@/app/record/components/MeetingNote";
+import { TocMenu } from "@/app/record/components/TocMenu";
 
 // 仮のデータ
 const mockMinutes = {
@@ -34,22 +37,22 @@ const mockMinutes = {
 };
 
 export default function MinutesPage({ params }: { params: { id: string } }) {
+  // TODO: params.id を使ってAPIからデータを取得する
+  const mockTitle = "議事録のタイトルが入ります";
+
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <Link href="/history" className="text-blue-500 hover:text-blue-600 transition-colors">
-            ← 履歴に戻る
-          </Link>
+    <div className="flex h-screen flex-col bg-[#F9F9F9]">
+      <Header title={mockTitle} />
+      <main className="flex-1 overflow-y-auto p-8">
+        <div className="mx-auto flex max-w-[1200px] gap-8">
+          <div className="min-w-0 flex-1">
+            <MeetingNote />
+          </div>
+          <div className="sticky top-8 h-fit w-[300px] flex-shrink-0">
+            <TocMenu />
+          </div>
         </div>
-        <h1 className="text-4xl font-bold mb-4">{mockMinutes.title}</h1>
-        <div className="text-gray-500 mb-8">
-          {mockMinutes.date} | {mockMinutes.duration}
-        </div>
-        <div className="prose max-w-none">
-          <pre className="whitespace-pre-wrap">{mockMinutes.content}</pre>
-        </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

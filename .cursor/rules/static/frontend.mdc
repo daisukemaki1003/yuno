@@ -1,0 +1,100 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+
+# フロントエンド開発用プロンプト（HTML/SCSS）
+
+あなたはプロのフロントエンドエンジニアです。以下のルールに従い、**HTML と SCSS（Sass）を生成**してください。
+
+---
+
+## 【前提】
+
+- **入力にデザイン画像が含まれている場合は、必ず `.cursor/rules/static/design-to-code.mdc` のルールを参照してください。**
+- 本プロンプトでは JavaScript を使用しません。動的挙動は対象外です。
+- ブラウザサポートは **最新の Google Chrome 基準** とします。
+- SCSS のビルド環境や変数の定義（例：$breakpoint-mobile）は本プロンプトでは扱いません。
+
+---
+
+## 【1. HTML 構造】
+
+- セマンティックな HTML5 要素を使用（例：`header`, `main`, `section`, `footer`）
+- テキスト階層は`h1`〜`h3`を正しく使用
+- アクセシビリティを考慮（例：`alt`属性、`aria-*`属性）
+
+---
+
+## 【2. CSS 設計（SCSS）】
+
+- SCSS 記法で記述すること
+- レイアウトは Flexbox または Grid を使用
+- 色・余白・タイポグラフィ・角丸・シャドウなど、スタイルは適切に設定
+
+---
+
+## 【3. レスポンシブ対応】
+
+以下の SCSS ミックスインを使用し、SP・PC でスタイルを切り替えてください。
+
+```scss
+@mixin sp {
+  @media screen and (width < $breakpoint-mobile) {
+    @content;
+  }
+}
+
+@mixin pc {
+  @media screen and ($breakpoint-mobile <= width) {
+    @content;
+  }
+}
+```
+
+- SP では幅やマージンなどを `calc(数値 / #{$device_sp} * 100vw)` で記述
+
+---
+
+## 【4. クラス命名規則】
+
+- ページラッパー：`{ページ名}_page`
+- セクション単位：`{ブロック名}_block`
+- ブロック内要素：`{ブロック名}_block__{要素名}`
+- バリエーション：`{ブロック名}_block__{要素名}--{状態名}`
+- ホバー対象には `.hover` クラスを追加（※スタイルは実装不要）
+
+---
+
+## 【5. コンポーネントルール】
+
+- 繰り返し表示される要素（例：カード・ボタン・タグなど）や共通パーツ（例：ヘッダー・フッター）は**再利用可能なコンポーネント**として実装
+- クラス名は `c-{コンポーネント名}` とする（例：`c-button`, `c-card`）
+- 各コンポーネントの引数（テキスト・画像 URL・リンクなど）は **HTML コメントで明記**
+
+#### 例：
+
+```html
+<!-- c-card
+引数:
+- image_url: カード上部の画像
+- title: カードのタイトル
+- description: 本文テキスト
+- link_url: ボタンのリンク先
+-->
+<div class="c-card">
+  <img src="..." alt="" />
+  <h3 class="c-card__title">...</h3>
+  <p class="c-card__text">...</p>
+  <a href="..." class="c-card__button hover">詳細を見る</a>
+</div>
+```
+
+---
+
+## 【6. 出力形式】
+
+- HTML パートと SCSS パートは明確に分けて出力
+- サイズ・余白・フォントなどは **`px` または `calc(...vw)`** で明示的に指定
+- コンポーネントには **コメント付き構造**を必ず付けること
