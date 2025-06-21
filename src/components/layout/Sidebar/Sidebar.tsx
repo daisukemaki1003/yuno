@@ -25,7 +25,7 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="w-64 h-screen bg-white border-r border-gray-200">
+    <div className="w-56 h-screen bg-white border-r border-gray-200">
       <div className="flex items-center justify-between pl-[24px] pr-[16px] mt-[20px]">
         <Link href="/">
           <img src="/images/common/ico_logo.webp" alt="Yuno" width={100} height={100} />

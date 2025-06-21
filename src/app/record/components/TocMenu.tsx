@@ -37,32 +37,66 @@ const StatusBadge = ({ status }: { status: "未確定" | "完了" }) => {
 };
 
 const TocMenu = () => {
+  // 階層構造に変換する関数
+  const buildHierarchy = (items: TocItem[]) => {
+    const result: (TocItem & { children?: TocItem[] })[] = [];
+    const level1Items = items.filter((item) => item.level === 1);
+
+    level1Items.forEach((level1Item) => {
+      const children = items.filter(
+        (item) => item.level === 2 && item.id.startsWith(level1Item.id + "-")
+      );
+
+      result.push({
+        ...level1Item,
+        children: children.length > 0 ? children : undefined,
+      });
+    });
+
+    return result;
+  };
+
+  const hierarchicalData = buildHierarchy(tocData);
+
   return (
-    <nav className="w-full rounded-xl bg-white p-4 shadow-sm">
+    <nav className="w-2/5 rounded-lg p-4">
       <h2 className="mb-4 px-2 text-base font-bold text-gray-800">目次</h2>
-      <ul className="space-y-1">
-        {tocData.map((item) => (
-          <li key={item.id}>
+      <ul className="space-y-2">
+        {hierarchicalData.map((item) => (
+          <li key={item.id} className="bg-white rounded-md">
             <a
               href={`#${item.id}`}
               className={cn(
-                "block w-full rounded-md py-1.5 text-sm transition-colors",
-                // レベルに応じたスタイル
-                item.level === 1
-                  ? "px-2 font-semibold"
-                  : "ml-2 border-l-2 border-gray-200 py-2 pl-4",
-                // アクティブな場合のスタイル
-                item.active ? "bg-gray-100 text-blue-600" : "text-gray-600 hover:bg-gray-50",
-                item.active && item.level > 1 && "border-blue-600"
+                "block w-full text-sm transition-colors hover:bg-gray-100",
+                "font-semibold px-3",
+                item.children ? "pt-3 pb-2" : "py-3"
               )}
             >
               <div className="flex items-center">
                 {item.status && <StatusBadge status={item.status} />}
-                <span>
-                  {item.level === 1 ? item.title : item.title.replace(/^\d+-?\d*\.?\s*/, "")}
-                </span>
+                <span>{item.title}</span>
               </div>
             </a>
+            {item.children && (
+              <ul className="space-y-1">
+                {item.children.map((child) => (
+                  <li key={child.id}>
+                    <a
+                      href={`#${child.id}`}
+                      className={cn(
+                        "block w-full py-2 text-xs transition-colors hover:bg-gray-100",
+                        "px-2 font-semibold pl-4"
+                      )}
+                    >
+                      <div className="flex items-center">
+                        {child.status && <StatusBadge status={child.status} />}
+                        <span>{child.title.replace(/^\d+-?\d*\.?\s*/, "")}</span>
+                      </div>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
           </li>
         ))}
       </ul>
