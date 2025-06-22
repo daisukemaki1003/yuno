@@ -25,7 +25,7 @@ export default function Header({ title }: HeaderProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-10 flex h-20 shrink-0 items-center justify-between px-8 transition-all transition-colors duration-200",
+        "sticky top-0 z-10 flex h-20 shrink-0 items-center justify-between px-8 transition-colors duration-200",
         isScrolled ? "h-14 bg-white shadow-sm" : "bg-[#EFF0F5]"
       )}
     >
