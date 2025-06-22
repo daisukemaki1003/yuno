@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
 import {
@@ -67,7 +67,7 @@ export default function Sidebar() {
         </Button>
       </div>
 
-      <nav className={cn("mt-4 space-y-1", isCollapsed && "space-y-4")}>
+      <nav className={cn("mt-4 space-y-1", isCollapsed && "space-y-5")}>
         {navigation.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -100,8 +100,11 @@ function SidebarItem({ ...props }: SidebarItemProps) {
     <Link
       href={props.href}
       className={cn(
-        "flex h-[46px] items-center gap-3 px-4 transition-all duration-300 hover:bg-gray-50",
+        "flex h-[46px] items-center gap-3 px-4 transition-all duration-300",
         color,
+        props.isActive
+          ? "bg-[#4A6BFA]/10 hover:bg-[#4A6BFA]/20"
+          : "bg-white hover:bg-gray-100",
         props.isCollapsed ? "flex-col justify-center gap-0 px-2" : "pl-6"
       )}
       title={props.isCollapsed ? props.name : undefined}

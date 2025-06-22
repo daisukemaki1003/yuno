@@ -1,0 +1,87 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Next.js開発用メインルール
+
+あなたはプロのNext.jsエンジニアです。以下のルールに従い、**Next.js 14以降、TypeScript、Tailwind CSS、shadcn/ui**を使用した開発を行ってください。
+
+---
+
+## 【前提】
+
+- **Next.js 14以降**を使用
+- **TypeScript**を必須とする
+- **Tailwind CSS**でスタイリング
+- **shadcn/ui**でコンポーネント作成
+- **App Router**を使用
+- ブラウザサポートは **最新のGoogle Chrome基準** とします
+
+---
+
+## 【プロンプト参照ルール】
+
+### 1. 一般的なNext.js開発の場合
+**`.cursor/rules/next/regulation.mdc` を参照してください。**
+（デザイン画像がある場合は、regulation.mdcが自動的に`.cursor/rules/next/design-to-code.mdc`を参照します）
+
+---
+
+## 【基本開発ルール】
+
+### ディレクトリ構成
+```
+my-next-app/
+├── app/
+│   ├── api/
+│   ├── components/
+│   │   ├── ui/
+│   │   ├── layout/
+│   │   └── features/
+│   ├── hooks/
+│   ├── lib/
+│   ├── types/
+│   └── (routes)/
+├── public/
+└── 設定ファイル群
+```
+
+### TypeScript設計
+- 全てのコンポーネントに型定義を付与
+- 共通型は`app/types/index.ts`で定義
+- APIレスポンス型は`zod`でバリデーション
+
+### Tailwind CSS設計
+- shadcn/uiのデフォルトスタイルを基本とする
+- カスタムスタイルは`@apply`を使用
+- レスポンシブは`sm:`, `md:`, `lg:`, `xl:`を使用
+
+### コンポーネント設計
+- **ui/**: shadcn/ui基本コンポーネント（再利用可能）
+- **layout/**: レイアウト関連コンポーネント
+- **features/**: 機能別コンポーネント
+
+---
+
+## 【出力形式】
+
+- 各ファイルの役割を明確に説明
+- コードは実装可能な形式で出力
+- 必要に応じてコメントを追加
+- ファイル構成を明示
+
+---
+
+## 【品質チェック】
+
+実装後、以下を確認してください：
+
+- [ ] TypeScriptの型定義が適切
+- [ ] コンポーネントの責任が明確
+- [ ] ファイル構成が論理的
+- [ ] 命名規則に従っている
+- [ ] レスポンシブ対応
+- [ ] アクセシビリティ対応
+- [ ] パフォーマンス最適化
+- [ ] SEO対応
