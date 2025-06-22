@@ -60,10 +60,8 @@ const MeetingNote: React.FC<MeetingNoteProps> = ({ content }) => {
 `;
 
   return (
-    <div className="w-full rounded-lg bg-white p-8">
-      <div className="markdown-body">
-        <ReactMarkdown>{content || defaultContent}</ReactMarkdown>
-      </div>
+    <div className="markdown-body">
+      <ReactMarkdown>{content || defaultContent}</ReactMarkdown>
     </div>
   );
 };
