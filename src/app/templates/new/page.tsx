@@ -16,16 +16,22 @@ export default function NewTemplatePage() {
 
   return (
     <main className="min-h-screen p-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="mx-auto max-w-4xl">
         <div className="mb-8">
-          <Link href="/templates" className="text-blue-500 hover:text-blue-600 transition-colors">
+          <Link
+            href="/templates"
+            className="text-blue-500 transition-colors hover:text-blue-600"
+          >
             ← テンプレート一覧に戻る
           </Link>
         </div>
-        <h1 className="text-4xl font-bold mb-8">テンプレート作成</h1>
+        <h1 className="mb-8 text-4xl font-bold">テンプレート作成</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="title"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               タイトル
             </label>
             <input
@@ -33,12 +39,15 @@ export default function NewTemplatePage() {
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="description"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               説明
             </label>
             <input
@@ -46,12 +55,15 @@ export default function NewTemplatePage() {
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
           <div>
-            <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="content"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               テンプレート内容
             </label>
             <textarea
@@ -59,14 +71,14 @@ export default function NewTemplatePage() {
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={10}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
           <div className="flex justify-end">
             <button
               type="submit"
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
+              className="rounded-lg bg-blue-500 px-6 py-3 text-white transition-colors hover:bg-blue-600"
             >
               保存
             </button>

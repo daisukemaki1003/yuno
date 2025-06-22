@@ -19,7 +19,10 @@ export default function Link({
   };
 
   return (
-    <NextLink className={`transition-colors ${variantClasses[variant]} ${className}`} {...props}>
+    <NextLink
+      className={`transition-colors ${variantClasses[variant]} ${className}`}
+      {...props}
+    >
       {children}
     </NextLink>
   );

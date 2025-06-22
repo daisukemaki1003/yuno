@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
+import { LassoSelect } from "lucide-react";
 
 type TocItem = {
   id: string;
@@ -13,7 +14,13 @@ type TocItem = {
 const tocData: TocItem[] = [
   { id: "1", title: "1. 課題", level: 1 },
   { id: "2", title: "2. スケジュール", level: 1, active: true },
-  { id: "2-1", title: "コーディング工数", level: 2, status: "未確定", active: true },
+  {
+    id: "2-1",
+    title: "コーディング工数",
+    level: 2,
+    status: "未確定",
+    active: true,
+  },
   { id: "2-2", title: "日程調整", level: 2, status: "完了" },
   { id: "2-3", title: "次回MTGの日程", level: 2, status: "未確定" },
   { id: "3", title: "3. 見積もり", level: 1 },
@@ -59,16 +66,16 @@ const TocMenu = () => {
   const hierarchicalData = buildHierarchy(tocData);
 
   return (
-    <nav className="w-2/5 rounded-lg p-4">
+    <nav className="sticky top-24 h-fit w-2/5 rounded-lg">
       <h2 className="mb-4 px-2 text-base font-bold text-gray-800">目次</h2>
       <ul className="space-y-2">
         {hierarchicalData.map((item) => (
-          <li key={item.id} className="bg-white rounded-md">
+          <li key={item.id} className="rounded-md bg-white">
             <a
               href={`#${item.id}`}
               className={cn(
                 "block w-full text-sm transition-colors hover:bg-gray-100",
-                "font-semibold px-3",
+                "px-3 font-semibold",
                 item.children ? "pt-3 pb-2" : "py-3"
               )}
             >
@@ -79,18 +86,21 @@ const TocMenu = () => {
             </a>
             {item.children && (
               <ul className="space-y-1">
-                {item.children.map((child) => (
+                {item.children.map((child, index) => (
                   <li key={child.id}>
                     <a
                       href={`#${child.id}`}
                       className={cn(
                         "block w-full py-2 text-xs transition-colors hover:bg-gray-100",
-                        "px-2 font-semibold pl-4"
+                        "px-2 pl-4 font-semibold",
+                        index === (item.children?.length ?? 0) - 1 && "pb-3"
                       )}
                     >
                       <div className="flex items-center">
                         {child.status && <StatusBadge status={child.status} />}
-                        <span>{child.title.replace(/^\d+-?\d*\.?\s*/, "")}</span>
+                        <span>
+                          {child.title.replace(/^\d+-?\d*\.?\s*/, "")}
+                        </span>
                       </div>
                     </a>
                   </li>

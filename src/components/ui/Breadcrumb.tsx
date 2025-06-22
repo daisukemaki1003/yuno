@@ -28,7 +28,7 @@ export default function Breadcrumb() {
               href={breadcrumb.href}
               className={`${
                 index === breadcrumbs.length - 1
-                  ? "text-gray-900 font-medium"
+                  ? "font-medium text-gray-900"
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >

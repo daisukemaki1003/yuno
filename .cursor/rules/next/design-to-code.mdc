@@ -1,9 +1,8 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
-
 # デザイン画像からコード生成用プロンプト
 
 あなたはプロの Next.js エンジニアです。**デザイン画像を分析し、忠実に Next.js、TypeScript、Tailwind CSS、shadcn/ui を使用したコードを生成**してください。
