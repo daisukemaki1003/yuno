@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/Button";
 import ReactMarkdown from "react-markdown";
 import "github-markdown-css";
 import "@/styles/github-markdown-override.css";
+import {
+  DownloadIcon,
+  FileIcon,
+  FileOutput,
+  SaveIcon,
+  SquarePenIcon,
+} from "lucide-react";
 
 export default function MinutesDetailPage() {
   // 仮のデータ
@@ -37,10 +44,10 @@ B: 目標には少し届きませんでしたが、既存顧客からの追加�
   const [tab, setTab] = useState<"minutes" | "transcript">("minutes");
 
   return (
-    <main className="min-h-screen p-8">
+    <main className="min-h-screen px-8">
       {/* ヘッダー部分 */}
-      <div className="mx-auto mb-8 flex max-w-5xl flex-col gap-4 rounded-2xl bg-white p-8 shadow">
-        <div className="flex items-center justify-between">
+      <div className="mx-auto mb-8 flex flex-col gap-4 rounded-2xl bg-white p-8 shadow">
+        <div className="flex items-start justify-between">
           <div>
             <h1 className="mb-2 text-3xl font-bold">{meeting.title}</h1>
             <div className="mb-1 text-sm text-gray-500">
@@ -58,15 +65,18 @@ B: 目標には少し届きませんでしたが、既存顧客からの追加�
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">エクスポート</Button>
-            <Button variant="outline">共有</Button>
-            <Button variant="outline">編集</Button>
+            <Button variant="outline">
+              <FileOutput className="mr-2 h-4 w-4" /> エクスポート
+            </Button>
+            <Button variant="outline">
+              <SquarePenIcon className="mr-2 h-4 w-4" /> 編集
+            </Button>
           </div>
         </div>
       </div>
 
       {/* メインコンテンツ */}
-      <div className="mx-auto max-w-5xl rounded-2xl bg-white">
+      <div className="mx-auto w-full rounded-2xl bg-white">
         {/* タブ */}
         <div className="flex border-b">
           <button

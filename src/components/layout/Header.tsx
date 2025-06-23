@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import RecButton from "../ui/RecButton";
 
 interface HeaderProps {
   title: string;
@@ -38,13 +39,8 @@ export default function Header({ title }: HeaderProps) {
         {title}
       </h1>
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 rounded-lg bg-gray-600 px-3 py-1.5 text-sm font-medium text-white">
-          <div className="relative flex h-3 w-3 items-center justify-center">
-            <div className="absolute h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></div>
-            <div className="h-2 w-2 rounded-full bg-red-500"></div>
-          </div>
-          録音中 00:42:18
-        </div>
+        <RecButton isRecording={true} recordingTime="00:42:18" />
+        <RecButton isRecording={false} />
         <Button
           variant="ghost"
           size="icon"
