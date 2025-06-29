@@ -10,7 +10,8 @@
       "Bash(mkdir:*)",
       "Bash(mv:*)",
       "Bash(rmdir:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "WebFetch(domain:console.firebase.google.com)"
     ],
     "deny": []
   }

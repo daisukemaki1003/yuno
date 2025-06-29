@@ -10,7 +10,7 @@ export function useAuth() {
   const requireAuth = () => {
     if (status === "loading") return;
     if (!session) {
-      router.push("/auth/sign-in");
+      router.push("/sign-in");
     }
   };
 
@@ -37,7 +37,7 @@ export function withAuth<P extends object>(
     useEffect(() => {
       if (status === "loading") return;
       if (!session) {
-        router.push("/auth/sign-in");
+        router.push("/sign-in");
       }
     }, [session, status, router]);
 

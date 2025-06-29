@@ -1,7 +1,7 @@
 "use client";
 
-import { useSidebarStore } from "@/app/lib/stores/sidebar-store";
-import { cn } from "@/app/lib/utils";
+import { useSidebarStore } from "@/lib/stores/sidebar-store";
+import { cn } from "@/lib/utils";
 import Header from "./Header";
 import { usePathname } from "next/navigation";
 import Footer from "./Footer";

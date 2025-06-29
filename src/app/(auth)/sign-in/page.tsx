@@ -1,4 +1,5 @@
 "use client";
+
 import { auth, provider } from "@/lib/firebase";
 import { signInWithPopup } from "firebase/auth";
 import React from "react";
