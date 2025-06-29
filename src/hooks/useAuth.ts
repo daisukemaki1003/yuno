@@ -31,7 +31,7 @@ export function withAuth<P extends object>(
   Component: React.ComponentType<P>
 ): React.ComponentType<P> {
   return function AuthenticatedComponent(props: P) {
-    const { session, status } = useSession();
+    const { data: session, status } = useSession();
     const router = useRouter();
 
     useEffect(() => {

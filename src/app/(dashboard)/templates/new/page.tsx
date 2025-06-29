@@ -9,9 +9,6 @@ import {
   Plus,
   X,
   FileText,
-  Users,
-  Calendar,
-  Clock,
 } from "lucide-react";
 
 export default function NewTemplatePage() {

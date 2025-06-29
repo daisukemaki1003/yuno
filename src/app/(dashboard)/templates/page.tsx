@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { Plus, FileText, Users, Calendar, Clock } from "lucide-react";
+import { Plus, FileText, Users, Calendar } from "lucide-react";
 
 // 仮のデータ
 const mockTemplates = [

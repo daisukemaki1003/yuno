@@ -1,6 +1,5 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import { LassoSelect } from "lucide-react";
 
 type TocItem = {
   id: string;

@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import {
@@ -10,8 +8,6 @@ import {
   FileText,
   Users,
   Calendar,
-  Clock,
-  Tag,
 } from "lucide-react";
 import { notFound } from "next/navigation";
 
@@ -54,15 +50,16 @@ const mockTemplates = [
 ];
 
 interface TemplateDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export default function TemplateDetailPage({
+export default async function TemplateDetailPage({
   params,
 }: TemplateDetailPageProps) {
-  const template = mockTemplates.find((t) => t.id === params.id);
+  const { id } = await params;
+  const template = mockTemplates.find((t) => t.id === id);
 
   if (!template) {
     notFound();

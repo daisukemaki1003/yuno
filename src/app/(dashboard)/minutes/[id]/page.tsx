@@ -4,12 +4,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import ReactMarkdown from "react-markdown";
 import "github-markdown-css";
-import "@/app/styles/github-markdown-override.css";
+import "@/styles/github-markdown-override.css";
 import {
-  DownloadIcon,
-  FileIcon,
   FileOutput,
-  SaveIcon,
   SquarePenIcon,
 } from "lucide-react";
 import { withAuth } from "@/hooks/useAuth";

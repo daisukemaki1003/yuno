@@ -2,7 +2,7 @@ import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { adminAuth } from "@/lib/firebase/admin";
 
-export const authOptions: NextAuthOptions = {
+const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -43,21 +43,17 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
-      if (user) {
+      if (user && 'refreshToken' in user) {
         token.refreshToken = user.refreshToken;
       }
       return token;
     },
-    async session({ session, token }) {
-      if (token.refreshToken) {
-        session.refreshToken = token.refreshToken as string;
-      }
+    async session({ session }) {
       return session;
     },
   },
   pages: {
-    signIn: "/auth/signin",
-    signUp: "/auth/signup",
+    signIn: "/sign-in",
   },
 };
 

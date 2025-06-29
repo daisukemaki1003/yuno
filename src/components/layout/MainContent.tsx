@@ -3,8 +3,6 @@
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
 import { cn } from "@/lib/utils";
 import Header from "./Header";
-import { usePathname } from "next/navigation";
-import Footer from "./Footer";
 
 interface MainContentProps {
   children: React.ReactNode;

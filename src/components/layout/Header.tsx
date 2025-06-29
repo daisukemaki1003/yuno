@@ -50,7 +50,7 @@ export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
   // 現在のページ設定を取得
   const getCurrentPageConfig = (): PageConfig => {

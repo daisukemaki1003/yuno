@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Button from "../../Button";
-import OutlineButton from "../../OutlineButton";
+import { Button } from "../Button";
 
 interface StartMeetingModalProps {
   isOpen: boolean;
@@ -73,7 +72,7 @@ export default function StartMeetingModal({
             </select>
           </div>
           <div className="mt-6 flex justify-end space-x-3">
-            <OutlineButton onClick={onClose}>キャンセル</OutlineButton>
+            <Button variant="outline" onClick={onClose}>キャンセル</Button>
             <Button type="submit">開始</Button>
           </div>
         </form>
