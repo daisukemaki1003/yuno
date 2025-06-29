@@ -1,7 +1,7 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import "github-markdown-css";
-import "@/styles/github-markdown-override.css";
+import "@/app/styles/github-markdown-override.css";
 
 interface MeetingNoteProps {
   content?: string;

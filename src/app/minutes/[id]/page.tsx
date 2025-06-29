@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import ReactMarkdown from "react-markdown";
 import "github-markdown-css";
-import "@/styles/github-markdown-override.css";
+import "@/app/styles/github-markdown-override.css";
 import {
   DownloadIcon,
   FileIcon,
@@ -12,8 +12,9 @@ import {
   SaveIcon,
   SquarePenIcon,
 } from "lucide-react";
+import { withAuth } from "@/hooks/useAuth";
 
-export default function MinutesDetailPage() {
+function MinutesDetailPage() {
   // 仮のデータ
   const meeting = {
     title: "2025年6月 営業戦略ミーティング",
@@ -107,3 +108,5 @@ B: 目標には少し届きませんでしたが、既存顧客からの追加�
     </main>
   );
 }
+
+export default withAuth(MinutesDetailPage);

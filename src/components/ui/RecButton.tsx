@@ -21,12 +21,8 @@ const RecButton: React.FC<RecButtonProps> = ({
       onClick={onClick}
       disabled={disabled}
       size="sm"
-      variant={isRecording ? "secondary" : "default"}
-      className={cn(
-        "gap-2",
-        isRecording && "bg-gray-600 text-white hover:bg-gray-700",
-        !isRecording && "bg-primary text-primary-foreground hover:bg-[#3E5DE3]"
-      )}
+      variant={isRecording ? "rec" : "default"}
+      className={cn("gap-2")}
     >
       {/* 録音インジケーター */}
       {isRecording && <RecIndicator isRecording={isRecording} />}
