@@ -9,30 +9,92 @@ import {
   Plus,
   X,
   FileText,
+  ChevronDown,
+  ChevronUp,
+  GripVertical,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import {
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+interface AgendaItem {
+  id: string;
+  title: string;
+  detail: string;
+}
 
 export default function NewTemplatePage() {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    category: "",
-    agenda: [""],
+    agenda: [{ id: "1", title: "", detail: "" }] as AgendaItem[],
   });
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
-  const handleAgendaChange = (index: number, value: string) => {
-    const newAgenda = [...formData.agenda];
-    newAgenda[index] = value;
+  const handleAgendaChange = (id: string, field: keyof AgendaItem, value: string) => {
+    const newAgenda = formData.agenda.map(item => 
+      item.id === id ? { ...item, [field]: value } : item
+    );
     setFormData({ ...formData, agenda: newAgenda });
   };
 
   const addAgendaItem = () => {
-    setFormData({ ...formData, agenda: [...formData.agenda, ""] });
+    const newId = String(Date.now());
+    setFormData({ 
+      ...formData, 
+      agenda: [...formData.agenda, { id: newId, title: "", detail: "" }] 
+    });
   };
 
-  const removeAgendaItem = (index: number) => {
-    const newAgenda = formData.agenda.filter((_, i) => i !== index);
+  const removeAgendaItem = (id: string) => {
+    const newAgenda = formData.agenda.filter(item => item.id !== id);
     setFormData({ ...formData, agenda: newAgenda });
   };
+
+  const toggleExpanded = (id: string) => {
+    setExpandedItems(prev => 
+      prev.includes(id) 
+        ? prev.filter(item => item !== id)
+        : [...prev, id]
+    );
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = formData.agenda.findIndex(item => item.id === active.id);
+      const newIndex = formData.agenda.findIndex(item => item.id === over.id);
+      
+      setFormData({
+        ...formData,
+        agenda: arrayMove(formData.agenda, oldIndex, newIndex)
+      });
+    }
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,31 +164,6 @@ export default function NewTemplatePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-1">
-                <div>
-                  <label
-                    htmlFor="category"
-                    className="mb-2 block text-sm font-medium text-gray-700"
-                  >
-                    カテゴリー
-                  </label>
-                  <select
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value })
-                    }
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                  >
-                    <option value="">選択してください</option>
-                    <option value="定例">定例</option>
-                    <option value="プロジェクト">プロジェクト</option>
-                    <option value="人事">人事</option>
-                    <option value="営業">営業</option>
-                    <option value="その他">その他</option>
-                  </select>
-                </div>
-              </div>
             </div>
 
             {/* アジェンダ */}
@@ -147,35 +184,31 @@ export default function NewTemplatePage() {
                 </Button>
               </div>
 
-              <div className="space-y-3">
-                {formData.agenda.map((item, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-600">
-                      {index + 1}
-                    </div>
-                    <Input
-                      type="text"
-                      value={item}
-                      onChange={(e) =>
-                        handleAgendaChange(index, e.target.value)
-                      }
-                      placeholder="アジェンダ項目を入力"
-                      className="flex-1"
-                    />
-                    {formData.agenda.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeAgendaItem(index)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={formData.agenda.map(item => item.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {formData.agenda.map((item, index) => (
+                      <SortableAgendaItem
+                        key={item.id}
+                        item={item}
+                        index={index}
+                        isExpanded={expandedItems.includes(item.id)}
+                        onToggle={() => toggleExpanded(item.id)}
+                        onChange={handleAgendaChange}
+                        onRemove={removeAgendaItem}
+                        canRemove={formData.agenda.length > 1}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             </div>
 
             {/* アクションボタン */}
@@ -191,6 +224,111 @@ export default function NewTemplatePage() {
           </form>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface SortableAgendaItemProps {
+  item: AgendaItem;
+  index: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onChange: (id: string, field: keyof AgendaItem, value: string) => void;
+  onRemove: (id: string) => void;
+  canRemove: boolean;
+}
+
+function SortableAgendaItem({
+  item,
+  index,
+  isExpanded,
+  onToggle,
+  onChange,
+  onRemove,
+  canRemove,
+}: SortableAgendaItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="rounded-lg border border-gray-200 bg-white shadow-sm"
+    >
+      <div className="flex items-center gap-3 p-4">
+        <button
+          type="button"
+          className="cursor-grab touch-none text-gray-400 hover:text-gray-600"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-5 w-5" />
+        </button>
+        
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-600">
+          {index + 1}
+        </div>
+        
+        <Input
+          type="text"
+          value={item.title}
+          onChange={(e) => onChange(item.id, "title", e.target.value)}
+          placeholder="アジェンダタイトルを入力"
+          className="flex-1"
+        />
+        
+        <button
+          type="button"
+          onClick={onToggle}
+          className="p-1 text-gray-400 hover:text-gray-600"
+        >
+          {isExpanded ? (
+            <ChevronUp className="h-5 w-5" />
+          ) : (
+            <ChevronDown className="h-5 w-5" />
+          )}
+        </button>
+        
+        {canRemove && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onRemove(item.id)}
+            className="text-red-600 hover:text-red-700"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+      
+      {isExpanded && (
+        <div className="border-t border-gray-100 p-4">
+          <label className="mb-2 block text-sm font-medium text-gray-700">
+            詳細
+          </label>
+          <textarea
+            value={item.detail}
+            onChange={(e) => onChange(item.id, "detail", e.target.value)}
+            placeholder="アジェンダの詳細を入力してください"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+            rows={4}
+          />
+        </div>
+      )}
     </div>
   );
 }

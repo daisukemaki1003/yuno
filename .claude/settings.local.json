@@ -11,7 +11,8 @@
       "Bash(mv:*)",
       "Bash(rmdir:*)",
       "Bash(npm run build:*)",
-      "WebFetch(domain:console.firebase.google.com)"
+      "WebFetch(domain:console.firebase.google.com)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }

@@ -17,40 +17,44 @@ interface PageConfig {
   onActionClick?: () => void;
 }
 
-// ページ設定マップ
-const pageConfigs: Record<string, PageConfig> = {
-  "/history": {
-    title: "議事録一覧",
-    showActionButton: true,
-    actionButtonIcon: Plus,
-    actionButtonText: "新規作成",
-    onActionClick: () => {
-      // 新規議事録作成の処理
-      console.log("新規議事録作成");
-    },
-  },
-  "/record": {
-    title: "文字起こし",
-    showActionButton: false,
-  },
-  "/templates": {
-    title: "テンプレート",
-    showActionButton: true,
-    actionButtonIcon: Plus,
-    actionButtonText: "新規テンプレート",
-    onActionClick: () => {
-      // 新規テンプレート作成の処理
-      console.log("新規テンプレート作成");
-    },
-  },
-};
-
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
+
+  // ページ設定マップ
+  const pageConfigs: Record<string, PageConfig> = {
+    "/history": {
+      title: "議事録一覧",
+      showActionButton: true,
+      actionButtonIcon: Plus,
+      actionButtonText: "新規作成",
+      onActionClick: () => {
+        // 新規議事録作成の処理
+        console.log("新規議事録作成");
+      },
+    },
+    "/record": {
+      title: "文字起こし",
+      showActionButton: false,
+    },
+    "/templates": {
+      title: "テンプレート",
+      showActionButton: true,
+      actionButtonIcon: Plus,
+      actionButtonText: "新規テンプレート",
+      onActionClick: () => {
+        // 新規テンプレート作成の処理
+        router.push("/templates/new");
+      },
+    },
+    "/templates/new": {
+      title: "新規テンプレート",
+      showActionButton: false,
+    },
+  };
 
   // 現在のページ設定を取得
   const getCurrentPageConfig = (): PageConfig => {
@@ -59,6 +63,7 @@ export default function Header() {
         return config;
       }
     }
+
     return { title: "Yuno" }; // デフォルト設定
   };
 

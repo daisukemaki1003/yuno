@@ -104,16 +104,18 @@ export default function TemplatesPage() {
               className="group relative overflow-hidden rounded-xl bg-white px-5 py-6 shadow-sm transition-all duration-200 hover:shadow-md hover:ring-2 hover:ring-blue-100"
             >
               {/* アイコンとタイトル */}
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                  {template.icon}
+              <Link href={`/templates/${template.id}`}>
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                    {template.icon}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600">
+                      {template.title}
+                    </h3>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600">
-                    {template.title}
-                  </h3>
-                </div>
-              </div>
+              </Link>
 
               {/* 説明 */}
               <p className="display-webkit-box -webkit-line-clamp-2 -webkit-box-orient-vertical mb-4 overflow-hidden text-sm text-ellipsis text-gray-600">
