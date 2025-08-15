@@ -2,7 +2,7 @@
 
 import MeetingNote from "./components/MeetingNote";
 import TocMenu from "./components/TocMenu";
-import { withAuth } from "@/hooks/useAuth";
+import { withAuth } from "@/shared/hooks/useAuth";
 
 function RecordPage() {
   return (

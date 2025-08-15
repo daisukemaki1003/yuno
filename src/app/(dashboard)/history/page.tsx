@@ -7,8 +7,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/Select";
-import { Input } from "@/components/ui/Input";
+} from "@/shared/components/ui/Select";
+import { Input } from "@/shared/components/ui/Input";
 import {
   Pagination,
   PaginationContent,
@@ -17,10 +17,10 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "@/components/ui/Pagination";
+} from "@/shared/components/ui/Pagination";
 import { Calendar, Search } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import Tag from "@/components/ui/Tag";
+import { Button } from "@/shared/components/ui/Button";
+import Tag from "@/shared/components/ui/Tag";
 
 const mockData = [
   {

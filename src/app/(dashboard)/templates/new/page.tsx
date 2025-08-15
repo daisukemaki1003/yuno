@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Button } from "@/shared/components/ui/Button";
+import { Input } from "@/shared/components/ui/Input";
 import { ROUTES } from "@/constants/routes";
 import {
   ArrowLeft,
@@ -29,9 +29,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import {
-  useSortable,
-} from "@dnd-kit/sortable";
+import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 interface AgendaItem {
@@ -48,8 +46,12 @@ export default function NewTemplatePage() {
   });
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
-  const handleAgendaChange = (id: string, field: keyof AgendaItem, value: string) => {
-    const newAgenda = formData.agenda.map(item => 
+  const handleAgendaChange = (
+    id: string,
+    field: keyof AgendaItem,
+    value: string
+  ) => {
+    const newAgenda = formData.agenda.map((item) =>
       item.id === id ? { ...item, [field]: value } : item
     );
     setFormData({ ...formData, agenda: newAgenda });
@@ -57,22 +59,20 @@ export default function NewTemplatePage() {
 
   const addAgendaItem = () => {
     const newId = String(Date.now());
-    setFormData({ 
-      ...formData, 
-      agenda: [...formData.agenda, { id: newId, title: "", detail: "" }] 
+    setFormData({
+      ...formData,
+      agenda: [...formData.agenda, { id: newId, title: "", detail: "" }],
     });
   };
 
   const removeAgendaItem = (id: string) => {
-    const newAgenda = formData.agenda.filter(item => item.id !== id);
+    const newAgenda = formData.agenda.filter((item) => item.id !== id);
     setFormData({ ...formData, agenda: newAgenda });
   };
 
   const toggleExpanded = (id: string) => {
-    setExpandedItems(prev => 
-      prev.includes(id) 
-        ? prev.filter(item => item !== id)
-        : [...prev, id]
+    setExpandedItems((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
 
@@ -80,12 +80,14 @@ export default function NewTemplatePage() {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const oldIndex = formData.agenda.findIndex(item => item.id === active.id);
-      const newIndex = formData.agenda.findIndex(item => item.id === over.id);
-      
+      const oldIndex = formData.agenda.findIndex(
+        (item) => item.id === active.id
+      );
+      const newIndex = formData.agenda.findIndex((item) => item.id === over.id);
+
       setFormData({
         ...formData,
-        agenda: arrayMove(formData.agenda, oldIndex, newIndex)
+        agenda: arrayMove(formData.agenda, oldIndex, newIndex),
       });
     }
   };
@@ -160,11 +162,10 @@ export default function NewTemplatePage() {
                     setFormData({ ...formData, description: e.target.value })
                   }
                   placeholder="テンプレートの説明を入力してください"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   rows={3}
                 />
               </div>
-
             </div>
 
             {/* アジェンダ */}
@@ -191,7 +192,7 @@ export default function NewTemplatePage() {
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={formData.agenda.map(item => item.id)}
+                  items={formData.agenda.map((item) => item.id)}
                   strategy={verticalListSortingStrategy}
                 >
                   <div className="space-y-3">
@@ -278,11 +279,11 @@ function SortableAgendaItem({
         >
           <GripVertical className="h-5 w-5" />
         </button>
-        
+
         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-600">
           {index + 1}
         </div>
-        
+
         <Input
           type="text"
           value={item.title}
@@ -290,7 +291,7 @@ function SortableAgendaItem({
           placeholder="アジェンダタイトルを入力"
           className="flex-1"
         />
-        
+
         <button
           type="button"
           onClick={onToggle}
@@ -302,7 +303,7 @@ function SortableAgendaItem({
             <ChevronDown className="h-5 w-5" />
           )}
         </button>
-        
+
         {canRemove && (
           <Button
             type="button"
@@ -315,7 +316,7 @@ function SortableAgendaItem({
           </Button>
         )}
       </div>
-      
+
       {isExpanded && (
         <div className="border-t border-gray-100 p-4">
           <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -325,7 +326,7 @@ function SortableAgendaItem({
             value={item.detail}
             onChange={(e) => onChange(item.id, "detail", e.target.value)}
             placeholder="アジェンダの詳細を入力してください"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             rows={4}
           />
         </div>

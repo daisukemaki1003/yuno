@@ -1,7 +1,7 @@
-import Footer from "@/components/layout/Footer";
-import Sidebar from "@/components/layout/Sidebar";
-import MainContent from "@/components/layout/MainContent";
-import { AuthGuard } from "@/components/auth/AuthGuard";
+import Footer from "@/shared/components/layout/Footer";
+import Sidebar from "@/shared/components/layout/Sidebar";
+import MainContent from "@/shared/components/layout/MainContent";
+import { AuthGuard } from "@/shared/components/auth/AuthGuard";
 
 export default function DashboardLayout({
   children,

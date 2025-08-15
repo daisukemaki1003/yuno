@@ -1,15 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/shared/components/ui/Button";
 import ReactMarkdown from "react-markdown";
 import "github-markdown-css";
 import "@/styles/github-markdown-override.css";
-import {
-  FileOutput,
-  SquarePenIcon,
-} from "lucide-react";
-import { withAuth } from "@/hooks/useAuth";
+import { FileOutput, SquarePenIcon } from "lucide-react";
+import { withAuth } from "@/shared/hooks/useAuth";
 
 function MinutesDetailPage() {
   // 仮のデータ

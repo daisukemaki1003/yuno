@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/shared/components/ui/Button";
 import { Plus, FileText, Users, Calendar } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 
@@ -119,7 +119,7 @@ export default function TemplatesPage() {
               </Link>
 
               {/* 説明 */}
-              <p className="display-webkit-box -webkit-line-clamp-2 -webkit-box-orient-vertical mb-4 overflow-hidden text-sm text-ellipsis text-gray-600">
+              <p className="display-webkit-box -webkit-line-clamp-2 -webkit-box-orient-vertical mb-4 overflow-hidden text-ellipsis text-sm text-gray-600">
                 {template.description}
               </p>
 
@@ -142,10 +142,14 @@ export default function TemplatesPage() {
               {/* アクションボタン */}
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="flex-1" asChild>
-                  <Link href={ROUTES.TEMPLATES_DETAIL(template.id)}>詳細を見る</Link>
+                  <Link href={ROUTES.TEMPLATES_DETAIL(template.id)}>
+                    詳細を見る
+                  </Link>
                 </Button>
                 <Button size="sm" className="flex-1" asChild>
-                  <Link href={`${ROUTES.RECORD}?template=${template.id}`}>使用する</Link>
+                  <Link href={`${ROUTES.RECORD}?template=${template.id}`}>
+                    使用する
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -165,7 +169,10 @@ export default function TemplatesPage() {
               最初のテンプレートを作成して、効率的にミーティングを始めましょう
             </p>
             <Button asChild>
-              <Link href={ROUTES.TEMPLATES_NEW} className="flex items-center gap-2">
+              <Link
+                href={ROUTES.TEMPLATES_NEW}
+                className="flex items-center gap-2"
+              >
                 <Plus className="h-4 w-4" />
                 テンプレートを作成
               </Link>

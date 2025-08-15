@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/shared/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/lib/stores/sidebar-store";
 import {
@@ -13,6 +13,7 @@ import {
   ChevronLast,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import Image from "next/image";
 
 const navigation = [
   { name: "会議", href: ROUTES.RECORD, img: <Video />, isActive: false },
@@ -46,7 +47,7 @@ export default function Sidebar() {
           href={ROUTES.HOME}
           className={cn("transition-opacity", isCollapsed && "opacity-0")}
         >
-          <img
+          <Image
             src="/images/common/ico_logo.webp"
             alt="Yuno"
             width={100}

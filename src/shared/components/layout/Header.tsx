@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/shared/components/ui/Button";
 import { User, Plus, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import RecButton from "../ui/RecButton";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { ROUTES } from "@/constants/routes";
-import { findMatchingPath } from "@/utils/path";
+import { findMatchingPath } from "@/shared/utils/path";
+import Image from "next/image";
 
 // ページ設定の型定義
 interface PageConfig {
@@ -145,7 +146,7 @@ export default function Header() {
             onClick={handleUserButtonClick}
           >
             {session?.user?.image ? (
-              <img
+              <Image
                 src={session.user.image}
                 alt={session.user.name || "User"}
                 className="h-6 w-6 rounded-full"
