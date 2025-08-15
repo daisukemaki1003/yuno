@@ -8,6 +8,7 @@ import RecButton from "../ui/RecButton";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { ROUTES } from "@/constants/routes";
+import { findMatchingPath } from "@/utils/path";
 
 // ページ設定の型定義
 interface PageConfig {
@@ -59,12 +60,8 @@ export default function Header() {
 
   // 現在のページ設定を取得
   const getCurrentPageConfig = (): PageConfig => {
-    for (const [path, config] of Object.entries(pageConfigs)) {
-      if (pathname.startsWith(path)) {
-        return config;
-      }
-    }
-
+    const matchingPath = findMatchingPath(pathname, pageConfigs);
+    if (matchingPath) return pageConfigs[matchingPath];
     return { title: "Yuno" }; // デフォルト設定
   };
 
