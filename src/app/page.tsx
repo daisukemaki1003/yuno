@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { ROUTES } from "@/constants/routes";
 
 export default function HomePage() {
   const { data: session, status } = useSession();
@@ -12,9 +13,9 @@ export default function HomePage() {
     if (status === "loading") return;
     
     if (session) {
-      router.push("/history");
+      router.push(ROUTES.HISTORY);
     } else {
-      router.push("/sign-in");
+      router.push(ROUTES.SIGNIN);
     }
   }, [session, status, router]);
 

@@ -2,6 +2,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import React from "react";
+import { ROUTES } from "@/constants/routes";
 
 export function useAuth() {
   const { data: session, status } = useSession();
@@ -10,7 +11,7 @@ export function useAuth() {
   const requireAuth = () => {
     if (status === "loading") return;
     if (!session) {
-      router.push("/sign-in");
+      router.push(ROUTES.SIGNIN);
     }
   };
 
@@ -37,7 +38,7 @@ export function withAuth<P extends object>(
     useEffect(() => {
       if (status === "loading") return;
       if (!session) {
-        router.push("/sign-in");
+        router.push(ROUTES.SIGNIN);
       }
     }, [session, status, router]);
 

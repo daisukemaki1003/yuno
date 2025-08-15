@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { ROUTES } from "@/constants/routes";
 import {
   ArrowLeft,
   Plus,
@@ -108,7 +109,7 @@ export default function NewTemplatePage() {
         {/* ヘッダー */}
         <div className="mb-6">
           <Link
-            href="/templates"
+            href={ROUTES.TEMPLATES}
             className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -218,7 +219,7 @@ export default function NewTemplatePage() {
                 テンプレートを作成
               </Button>
               <Button variant="outline" asChild>
-                <Link href="/templates">キャンセル</Link>
+                <Link href={ROUTES.TEMPLATES}>キャンセル</Link>
               </Button>
             </div>
           </form>

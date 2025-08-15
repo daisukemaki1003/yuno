@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Plus, FileText, Users, Calendar } from "lucide-react";
+import { ROUTES } from "@/constants/routes";
 
 // 仮のデータ
 const mockTemplates = [
@@ -104,7 +105,7 @@ export default function TemplatesPage() {
               className="group relative overflow-hidden rounded-xl bg-white px-5 py-6 shadow-sm transition-all duration-200 hover:shadow-md hover:ring-2 hover:ring-blue-100"
             >
               {/* アイコンとタイトル */}
-              <Link href={`/templates/${template.id}`}>
+              <Link href={ROUTES.TEMPLATES_DETAIL(template.id)}>
                 <div className="mb-4 flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                     {template.icon}
@@ -141,10 +142,10 @@ export default function TemplatesPage() {
               {/* アクションボタン */}
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="flex-1" asChild>
-                  <Link href={`/templates/${template.id}`}>詳細を見る</Link>
+                  <Link href={ROUTES.TEMPLATES_DETAIL(template.id)}>詳細を見る</Link>
                 </Button>
                 <Button size="sm" className="flex-1" asChild>
-                  <Link href={`/record?template=${template.id}`}>使用する</Link>
+                  <Link href={`${ROUTES.RECORD}?template=${template.id}`}>使用する</Link>
                 </Button>
               </div>
             </div>
@@ -164,7 +165,7 @@ export default function TemplatesPage() {
               最初のテンプレートを作成して、効率的にミーティングを始めましょう
             </p>
             <Button asChild>
-              <Link href="/templates/new" className="flex items-center gap-2">
+              <Link href={ROUTES.TEMPLATES_NEW} className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 テンプレートを作成
               </Link>

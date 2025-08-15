@@ -10,6 +10,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { notFound } from "next/navigation";
+import { ROUTES } from "@/constants/routes";
 
 // 仮のデータ
 const mockTemplates = [
@@ -71,7 +72,7 @@ export default async function TemplateDetailPage({
         {/* ヘッダー */}
         <div className="mb-6">
           <Link
-            href="/templates"
+            href={ROUTES.TEMPLATES}
             className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -99,9 +100,11 @@ export default async function TemplateDetailPage({
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
+              <Link href={`${ROUTES.TEMPLATES}/${template.id}/edit`}>
+                {/* <Button variant="outline" size="sm"> */}
                 <Edit className="h-4 w-4" />
-              </Button>
+                {/* </Button> */}
+              </Link>
               <Button
                 variant="outline"
                 size="sm"
@@ -125,13 +128,15 @@ export default async function TemplateDetailPage({
           {/* アクションボタン */}
           <div className="flex gap-3">
             <Button asChild className="flex items-center gap-2">
-              <Link href={`/record?template=${template.id}`}>
+              <Link href={`${ROUTES.RECORD}?template=${template.id}`}>
                 <Play className="h-4 w-4" />
                 このテンプレートで開始
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href={`/templates/${template.id}/edit`}>編集する</Link>
+              <Link href={`${ROUTES.TEMPLATES}/${template.id}/edit`}>
+                編集する
+              </Link>
             </Button>
           </div>
         </div>

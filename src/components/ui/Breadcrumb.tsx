@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ROUTES } from "@/constants/routes";
 
 export default function Breadcrumb() {
   const pathname = usePathname();
@@ -17,7 +18,7 @@ export default function Breadcrumb() {
     <nav className="flex" aria-label="Breadcrumb">
       <ol className="flex items-center space-x-2">
         <li>
-          <Link href="/" className="text-gray-500 hover:text-gray-700">
+          <Link href={ROUTES.HOME} className="text-gray-500 hover:text-gray-700">
             ホーム
           </Link>
         </li>

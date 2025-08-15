@@ -12,13 +12,14 @@ import {
   ChevronFirst,
   ChevronLast,
 } from "lucide-react";
+import { ROUTES } from "@/constants/routes";
 
 const navigation = [
-  { name: "会議", href: "/record", img: <Video />, isActive: false },
-  { name: "履歴", href: "/history", img: <History />, isActive: false },
+  { name: "会議", href: ROUTES.RECORD, img: <Video />, isActive: false },
+  { name: "履歴", href: ROUTES.HISTORY, img: <History />, isActive: false },
   {
     name: "テンプレート",
-    href: "/templates",
+    href: ROUTES.TEMPLATES,
     img: <FileText />,
     isActive: false,
   },
@@ -42,7 +43,7 @@ export default function Sidebar() {
         )}
       >
         <Link
-          href="/"
+          href={ROUTES.HOME}
           className={cn("transition-opacity", isCollapsed && "opacity-0")}
         >
           <img

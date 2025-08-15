@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import RecButton from "../ui/RecButton";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { ROUTES } from "@/constants/routes";
 
 // ページ設定の型定義
 interface PageConfig {
@@ -26,7 +27,7 @@ export default function Header() {
 
   // ページ設定マップ
   const pageConfigs: Record<string, PageConfig> = {
-    "/history": {
+    [ROUTES.HISTORY]: {
       title: "議事録一覧",
       showActionButton: true,
       actionButtonIcon: Plus,
@@ -36,21 +37,21 @@ export default function Header() {
         console.log("新規議事録作成");
       },
     },
-    "/record": {
+    [ROUTES.RECORD]: {
       title: "文字起こし",
       showActionButton: false,
     },
-    "/templates": {
+    [ROUTES.TEMPLATES]: {
       title: "テンプレート",
       showActionButton: true,
       actionButtonIcon: Plus,
       actionButtonText: "新規テンプレート",
       onActionClick: () => {
         // 新規テンプレート作成の処理
-        router.push("/templates/new");
+        router.push(ROUTES.TEMPLATES_NEW);
       },
     },
-    "/templates/new": {
+    [ROUTES.TEMPLATES_NEW]: {
       title: "新規テンプレート",
       showActionButton: false,
     },
@@ -73,12 +74,12 @@ export default function Header() {
     if (session) {
       setShowUserMenu(!showUserMenu);
     } else {
-      router.push("/auth/sign-in");
+      router.push(ROUTES.SIGNIN);
     }
   };
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: "/" });
+    await signOut({ callbackUrl: ROUTES.HOME });
     setShowUserMenu(false);
   };
 

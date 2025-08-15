@@ -1,6 +1,7 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { adminAuth } from "@/lib/firebase/admin";
+import { ROUTES } from "@/constants/routes";
 
 const authOptions: NextAuthOptions = {
   providers: [
@@ -53,7 +54,7 @@ const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: "/sign-in",
+    signIn: ROUTES.SIGNIN,
   },
 };
 

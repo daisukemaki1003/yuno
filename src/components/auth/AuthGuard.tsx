@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { ROUTES } from "@/constants/routes";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -16,7 +17,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     if (status === "loading") return;
     
     if (!session) {
-      router.push("/sign-in");
+      router.push(ROUTES.SIGNIN);
       return;
     }
   }, [session, status, router]);

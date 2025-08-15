@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ROUTES } from "@/constants/routes";
 
 interface LogoProps {
   size?: "sm" | "md" | "lg";
@@ -12,7 +13,7 @@ export default function Logo({ size = "md" }: LogoProps) {
   };
 
   return (
-    <Link href="/" className={`font-bold text-blue-600 ${sizeClasses[size]}`}>
+    <Link href={ROUTES.HOME} className={`font-bold text-blue-600 ${sizeClasses[size]}`}>
       Yuno
     </Link>
   );
