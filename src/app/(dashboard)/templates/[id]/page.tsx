@@ -100,11 +100,11 @@ export default async function TemplateDetailPage({
               </div>
             </div>
             <div className="flex gap-2">
-              <Link href={`${ROUTES.TEMPLATES}/${template.id}/edit`}>
-                {/* <Button variant="outline" size="sm"> */}
-                <Edit className="h-4 w-4" />
-                {/* </Button> */}
-              </Link>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`${ROUTES.TEMPLATES}/${template.id}/edit`}>
+                  <Edit size={16} />
+                </Link>
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
