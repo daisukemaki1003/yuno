@@ -1,5 +1,5 @@
 import React from "react";
-import { cn } from "@/lib/utils";
+import {cn} from "@/lib/utils";
 
 type TocItem = {
   id: string;
@@ -11,8 +11,8 @@ type TocItem = {
 
 // 階層構造を持つデータ。アクティブな項目を複数設定できるように調整。
 const tocData: TocItem[] = [
-  { id: "1", title: "1. 課題", level: 1 },
-  { id: "2", title: "2. スケジュール", level: 1, active: true },
+  {id: "1", title: "1. 課題", level: 1},
+  {id: "2", title: "2. スケジュール", level: 1, active: true},
   {
     id: "2-1",
     title: "コーディング工数",
@@ -20,15 +20,15 @@ const tocData: TocItem[] = [
     status: "未確定",
     active: true,
   },
-  { id: "2-2", title: "日程調整", level: 2, status: "完了" },
-  { id: "2-3", title: "次回MTGの日程", level: 2, status: "未確定" },
-  { id: "3", title: "3. 見積もり", level: 1 },
-  { id: "4", title: "4. 仕様", level: 1 },
-  { id: "5", title: "5. サーバーについて", level: 1 },
-  { id: "5-1", title: "ドメインの取得", level: 2, status: "未確定" },
+  {id: "2-2", title: "日程調整", level: 2, status: "完了"},
+  {id: "2-3", title: "次回MTGの日程", level: 2, status: "未確定"},
+  {id: "3", title: "3. 見積もり", level: 1},
+  {id: "4", title: "4. 仕様", level: 1},
+  {id: "5", title: "5. サーバーについて", level: 1},
+  {id: "5-1", title: "ドメインの取得", level: 2, status: "未確定"},
 ];
 
-const StatusBadge = ({ status }: { status: "未確定" | "完了" }) => {
+const StatusBadge = ({status}: {status: "未確定" | "完了"}) => {
   const isPending = status === "未確定";
   return (
     <span
@@ -45,7 +45,7 @@ const StatusBadge = ({ status }: { status: "未確定" | "完了" }) => {
 const TocMenu = () => {
   // 階層構造に変換する関数
   const buildHierarchy = (items: TocItem[]) => {
-    const result: (TocItem & { children?: TocItem[] })[] = [];
+    const result: (TocItem & {children?: TocItem[]})[] = [];
     const level1Items = items.filter((item) => item.level === 1);
 
     level1Items.forEach((level1Item) => {

@@ -1,12 +1,22 @@
 "use client";
 
-import { auth, provider } from "@/lib/firebase";
-import { signInWithPopup } from "firebase/auth";
-import React from "react";
-import { useSession, signIn as nextAuthSignIn, signOut } from "next-auth/react";
+import {auth, provider} from "@/lib/firebase";
+import {signInWithPopup} from "firebase/auth";
+import React, {useEffect} from "react";
+import {useSession, signIn as nextAuthSignIn, signOut} from "next-auth/react";
+import {useRouter} from "next/navigation";
+import {ROUTES} from "@/constants/routes";
 
 export default function SignIn() {
-  const { data: session, status } = useSession();
+  const {data: session, status} = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    // ログイン済みの場合はヒストリーページにリダイレクト
+    if (status !== "loading") {
+      router.push(ROUTES.HISTORY);
+    }
+  }, [session, status, router]);
 
   const signInWithGoogle = async () => {
     try {
@@ -29,7 +39,7 @@ export default function SignIn() {
   };
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: "/" });
+    await signOut({callbackUrl: "/"});
   };
 
   if (status === "loading") {

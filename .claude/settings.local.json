@@ -13,7 +13,13 @@
       "Bash(npm run build:*)",
       "WebFetch(domain:console.firebase.google.com)",
       "Bash(npm install:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(npx tsc:*)",
+      "Bash(npm ls:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npm run typecheck:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

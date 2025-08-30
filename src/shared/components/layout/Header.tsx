@@ -1,21 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Button } from "@/shared/components/ui/Button";
-import { User, Plus, LogOut } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {useState, useEffect} from "react";
+import {Button} from "@/shared/components/ui/Button";
+import {User, Plus, LogOut} from "lucide-react";
+import {cn} from "@/lib/utils";
 import RecButton from "../ui/RecButton";
-import { usePathname, useRouter } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
-import { ROUTES } from "@/constants/routes";
-import { findMatchingPath } from "@/shared/utils/path";
+import {usePathname, useRouter} from "next/navigation";
+import {useSession, signOut} from "next-auth/react";
+import {ROUTES} from "@/constants/routes";
+import {findMatchingPath} from "@/shared/utils/path";
 import Image from "next/image";
 
 // ページ設定の型定義
 interface PageConfig {
   title: string;
   showActionButton?: boolean;
-  actionButtonIcon?: React.ComponentType<{ className?: string }>;
+  actionButtonIcon?: React.ComponentType<{className?: string}>;
   actionButtonText?: string;
   onActionClick?: () => void;
 }
@@ -25,7 +25,7 @@ export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { data: session } = useSession();
+  const {data: session} = useSession();
 
   // ページ設定マップ
   const pageConfigs: Record<string, PageConfig> = {
@@ -63,7 +63,7 @@ export default function Header() {
   const getCurrentPageConfig = (): PageConfig => {
     const matchingPath = findMatchingPath(pathname, pageConfigs);
     if (matchingPath) return pageConfigs[matchingPath];
-    return { title: "Yuno" }; // デフォルト設定
+    return {title: "Yuno"}; // デフォルト設定
   };
 
   const currentPageConfig = getCurrentPageConfig();
@@ -77,7 +77,7 @@ export default function Header() {
   };
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: ROUTES.HOME });
+    await signOut({callbackUrl: ROUTES.HOME});
     setShowUserMenu(false);
   };
 
@@ -149,7 +149,9 @@ export default function Header() {
               <Image
                 src={session.user.image}
                 alt={session.user.name || "User"}
-                className="h-6 w-6 rounded-full"
+                className="rounded-full"
+                width={24}
+                height={24}
               />
             ) : (
               <User className="h-6 w-6 text-white" />
