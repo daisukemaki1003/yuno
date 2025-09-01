@@ -52,8 +52,8 @@ const RecButton: React.FC<RecButtonProps> = ({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          meetUrl,
-          botName,
+          meetingUrl: meetUrl,
+          botName: botName,
         }),
       });
 

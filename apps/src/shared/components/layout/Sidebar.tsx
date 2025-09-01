@@ -12,6 +12,7 @@ import {
   ChevronFirst,
   ChevronLast,
   Code,
+  Settings,
 } from "lucide-react";
 import {ROUTES} from "@/constants/routes";
 import Image from "next/image";
@@ -26,6 +27,7 @@ const navigation = [
     isActive: false,
   },
   {name: "API", href: ROUTES.API, img: <Code />, isActive: false},
+  {name: "設定", href: ROUTES.SETTINGS, img: <Settings />, isActive: false},
 ];
 
 export default function Sidebar() {

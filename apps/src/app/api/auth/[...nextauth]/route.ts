@@ -3,7 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { adminAuth } from "@/lib/firebase/admin";
 import { ROUTES } from "@/constants/routes";
 
-const authOptions: NextAuthOptions = {
+export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
