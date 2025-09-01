@@ -20,7 +20,9 @@
       "mcp__ide__getDiagnostics",
       "Bash(npm run typecheck:*)",
       "Bash(rm:*)",
-      "Bash(npm cache clean:*)"
+      "Bash(npm cache clean:*)",
+      "Bash(find:*)",
+      "Bash(npx tailwindcss config:*)"
     ],
     "deny": []
   }
