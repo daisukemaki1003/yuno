@@ -1,10 +1,10 @@
 "use client";
 
 import {useState, useEffect} from "react";
-import {Button} from "@/shared/components/ui/Button";
+import {Button} from "@/shared/components/atoms/Button";
 import {User, Plus, LogOut} from "lucide-react";
 import {cn} from "@/lib/utils";
-import RecButton from "../ui/RecButton";
+import RecButton from "../molecules/RecButton";
 import {usePathname, useRouter} from "next/navigation";
 import {useSession, signOut} from "next-auth/react";
 import {ROUTES} from "@/constants/routes";
@@ -134,7 +134,7 @@ export default function Header() {
             </Button>
           )}
 
-        <RecButton isRecording={true} recordingTime="00:42:18" />
+        <RecButton isRecording={false} recordingTime="00:42:18" />
         {/* <RecButton isRecording={false} /> */}
 
         {/* ユーザーメニュー */}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button } from "@/shared/components/ui/Button";
+import { Button } from "@/shared/components/atoms/Button";
 import {
   ArrowLeft,
   Edit,

@@ -7,8 +7,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/shared/components/ui/Select";
-import { Input } from "@/shared/components/ui/Input";
+} from "@/shared/components/atoms/Select";
+import {Input} from "@/shared/components/atoms/Input";
 import {
   Pagination,
   PaginationContent,
@@ -17,10 +17,10 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "@/shared/components/ui/Pagination";
-import { Calendar, Search } from "lucide-react";
-import { Button } from "@/shared/components/ui/Button";
-import Tag from "@/shared/components/ui/Tag";
+} from "@/shared/components/atoms/Pagination";
+import {Calendar, Search} from "lucide-react";
+import {Button} from "@/shared/components/atoms/Button";
+import Tag from "@/shared/components/atoms/Tag";
 
 const mockData = [
   {
@@ -91,8 +91,8 @@ export default function HistoryPage() {
           <Input
             placeholder="議事録を検索する"
             className="bg-white pl-10"
-            // value={searchTerm}
-            // onChange={(e) => setSearchTerm(e.target.value)}
+          // value={searchTerm}
+          // onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <Select>

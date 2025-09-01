@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import {usePathname} from "next/navigation";
-import {Button} from "@/shared/components/ui/Button";
+import {Button} from "@/shared/components/atoms/Button";
 import {cn} from "@/lib/utils";
 import {useSidebarStore} from "@/lib/stores/sidebar-store";
 import {

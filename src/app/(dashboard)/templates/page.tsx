@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from "@/shared/components/ui/Button";
+import { Button } from "@/shared/components/atoms/Button";
 import { Plus, FileText, Users, Calendar } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 

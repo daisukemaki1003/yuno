@@ -19,7 +19,8 @@
       "Bash(npm ls:*)",
       "mcp__ide__getDiagnostics",
       "Bash(npm run typecheck:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npm cache clean:*)"
     ],
     "deny": []
   }

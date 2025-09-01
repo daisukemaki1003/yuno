@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Button } from "@/shared/components/ui/Button";
-import { Input } from "@/shared/components/ui/Input";
+import { Button } from "@/shared/components/atoms/Button";
+import { Input } from "@/shared/components/atoms/Input";
 import { ROUTES } from "@/constants/routes";
 import {
   ArrowLeft,
