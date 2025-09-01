@@ -1,34 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Button } from "@/shared/components/ui/Button";
-import { cn } from "@/lib/utils";
-import { useSidebarStore } from "@/lib/stores/sidebar-store";
+import {usePathname} from "next/navigation";
+import {Button} from "@/shared/components/ui/Button";
+import {cn} from "@/lib/utils";
+import {useSidebarStore} from "@/lib/stores/sidebar-store";
 import {
   History,
   Video,
   FileText,
   ChevronFirst,
   ChevronLast,
+  Code,
 } from "lucide-react";
-import { ROUTES } from "@/constants/routes";
+import {ROUTES} from "@/constants/routes";
 import Image from "next/image";
 
 const navigation = [
-  { name: "会議", href: ROUTES.RECORD, img: <Video />, isActive: false },
-  { name: "履歴", href: ROUTES.HISTORY, img: <History />, isActive: false },
+  {name: "会議", href: ROUTES.RECORD, img: <Video />, isActive: false},
+  {name: "履歴", href: ROUTES.HISTORY, img: <History />, isActive: false},
   {
     name: "テンプレート",
     href: ROUTES.TEMPLATES,
     img: <FileText />,
     isActive: false,
   },
+  {name: "API", href: ROUTES.API, img: <Code />, isActive: false},
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { isCollapsed, toggle } = useSidebarStore();
+  const {isCollapsed, toggle} = useSidebarStore();
 
   return (
     <div
@@ -95,7 +97,7 @@ interface SidebarItemProps {
   isCollapsed?: boolean;
 }
 
-function SidebarItem({ ...props }: SidebarItemProps) {
+function SidebarItem({...props}: SidebarItemProps) {
   const color = props.isActive ? "text-blue-600" : "text-gray-600";
 
   return (
