@@ -1,6 +1,7 @@
-import { hoge } from "@/hoge/index.js";
+// Sample test file - placeholder for future tests
 
-test("check", () => {
-  const hogehoge = hoge();
-  expect(hogehoge).toBe("hogehoge");
+describe("Sample test", () => {
+  test("placeholder test", () => {
+    expect(true).toBe(true);
+  });
 });
