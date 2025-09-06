@@ -1,16 +1,24 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "main": "index.js",
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "functions-framework --target=helloGET",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "build:watch": "tsc -w",
+    "serve": "functions-framework --target=helloGET --source=dist/index.js --port=8080",
+    "dev": "concurrently -k -n BUILD,SERVER -c blue,green \"pnpm:build:watch\" \"nodemon -w dist -e js --exec pnpm serve\""
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
     "@google-cloud/functions-framework": "^4.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.1.10",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
   }
 }
