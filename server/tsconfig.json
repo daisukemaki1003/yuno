@@ -3,6 +3,7 @@
     "target": "es2022",
     "module": "node16",
     "moduleResolution": "node16",
+    "isolatedModules": true,
     "baseUrl": "./src",
     "paths": {
       "@/*": [
@@ -18,7 +19,8 @@
     "strict": true,
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "test/**/*"
   ],
   "exclude": [
     "dist",
