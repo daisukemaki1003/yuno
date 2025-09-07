@@ -67,6 +67,8 @@ export async function addBot(c: Context): Promise<Response> {
     // Add bot to meeting
     const result = await baas.addBot(meetingUrl, botName);
 
+    logger.info("result", { result });
+
     // Get initial status
     const statusResult = await baas.getBotStatus(result.botId);
 

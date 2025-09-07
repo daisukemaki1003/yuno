@@ -19,6 +19,7 @@
   "dependencies": {
     "@google-cloud/functions-framework": "^4.0.0",
     "@hono/node-server": "^1.19.1",
+    "chalk": "^5.6.0",
     "dotenv": "^17.2.2",
     "eventsource-parser": "^3.0.6",
     "hono": "^4.9.6",
