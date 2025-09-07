@@ -19,7 +19,6 @@ describe('MeetingBaasAdapterV1', () => {
         endpoints: {
             addBot: { method: 'POST', path: '/v1/bots' },
             leaveBot: { method: 'POST', path: '/v1/bots/:botId/leave' },
-            botStatus: { method: 'GET', path: '/v1/bots/:botId' },
             stream: { protocol: 'sse', path: '/v1/meetings/:meetingId/recording' },
         },
         maps: {
@@ -85,32 +84,6 @@ describe('MeetingBaasAdapterV1', () => {
                 text: async () => 'Bad Request',
             });
             await expect(adapter.addBot('meeting-456')).rejects.toThrow();
-        });
-    });
-    describe('getBotStatus', () => {
-        test('should map vendor status to domain status', async () => {
-            const vendorResponse = { status: 'ACTIVE', bot_id: 'bot-123' };
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                text: async () => JSON.stringify(vendorResponse),
-            });
-            const result = await adapter.getBotStatus('bot-123');
-            expect(mockFetch).toHaveBeenCalledWith('https://api.test.com/v1/bots/bot-123', expect.objectContaining({
-                method: 'GET',
-                headers: expect.objectContaining({
-                    'Authorization': 'Bearer test-api-key',
-                }),
-            }));
-            expect(result).toEqual({ status: 'joined' });
-        });
-        test('should handle unknown vendor status', async () => {
-            const vendorResponse = { status: 'UNKNOWN_STATUS' };
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                text: async () => JSON.stringify(vendorResponse),
-            });
-            const result = await adapter.getBotStatus('bot-123');
-            expect(result).toEqual({ status: 'error' });
         });
     });
     describe('leaveBot', () => {
@@ -214,10 +187,10 @@ describe('MeetingBaasAdapterV1', () => {
             const customAdapter = createMeetingBaasAdapter(customConfig, testApiKey);
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                text: async () => JSON.stringify({ status: 'CONNECTED' }),
+                text: async () => JSON.stringify({ bot_id: 'bot-123' }),
             });
-            const result = await customAdapter.getBotStatus('bot-123');
-            expect(result).toEqual({ status: 'joined' });
+            const result = await customAdapter.addBot('test-meeting');
+            expect(result).toEqual({ botId: 'bot-123' });
         });
     });
 });

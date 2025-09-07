@@ -1,7 +1,7 @@
 import { HttpClient } from "./http.client.js";
 import { Logger } from "@/utils/logger.js";
 import { badRequest, internal } from "@/utils/errors.js";
-import { VendorAddBotResponseSchema, VendorBotStatusResponseSchema, parseVendorStreamEvent, VendorAudioEventSchema, VendorTranscriptEventSchema, } from "@/schemas/vendor/meetingbaas.v1.js";
+import { VendorAddBotResponseSchema, parseVendorStreamEvent, VendorAudioEventSchema, VendorTranscriptEventSchema, } from "@/schemas/vendor/meetingbaas.v1.js";
 import { createParser } from "eventsource-parser";
 /**
  * Create Meeting BaaS adapter with given configuration
@@ -43,11 +43,6 @@ class MeetingBaasAdapterV1 {
                 waiting_room_timeout: 600,
             },
         };
-        console.log("================================================");
-        console.log("requestBody", requestBody);
-        console.log("url", url);
-        console.log("headers", headers);
-        console.log("================================================");
         try {
             const response = await this.http.fetchJson(url, {
                 method: this.config.endpoints.addBot.method,
@@ -76,24 +71,6 @@ class MeetingBaasAdapterV1 {
         }
         catch (err) {
             this.logger.error("Failed to leave bot", { meetingId, botId, error: err });
-            throw this.mapError(err);
-        }
-    }
-    async getBotStatus(botId) {
-        const url = this.buildUrl(this.config.endpoints.botStatus.path, { botId });
-        const headers = this.buildHeaders();
-        try {
-            const response = await this.http.fetchJson(url, {
-                method: this.config.endpoints.botStatus.method,
-                headers,
-                timeoutMs: this.config.timeouts.requestMs,
-            });
-            const parsed = VendorBotStatusResponseSchema.parse(response);
-            const domainStatus = this.mapStatus(parsed.status);
-            return { status: domainStatus };
-        }
-        catch (err) {
-            this.logger.error("Failed to get bot status", { botId, error: err });
             throw this.mapError(err);
         }
     }
@@ -150,14 +127,6 @@ class MeetingBaasAdapterV1 {
             }
         }
         return headers;
-    }
-    mapStatus(vendorStatus) {
-        const mapped = this.config.maps.status[vendorStatus];
-        if (!mapped) {
-            this.logger.warn("Unknown vendor status", { vendorStatus });
-            return "error";
-        }
-        return mapped;
     }
     mapError(err) {
         if (err instanceof Error) {

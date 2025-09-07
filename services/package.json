@@ -13,7 +13,9 @@
     "serve": "functions-framework --target=helloGET --source=dist/index.js --port=8080",
     "test": "jest",
     "mock:meetingbaas": "tsx mocks/meetingbaas/server.ts",
-    "dev:mock": "cross-env MEETING_BAAS_BASE_URL=http://127.0.0.1:4010 pnpm dev"
+    "mock:meetingbaas:stop": "lsof -ti :${MOCK_PORT:-4010} | xargs kill -9 2>/dev/null || echo 'No process found on port'",
+    "mock:meetingbaas:restart": "pnpm mock:meetingbaas:stop && pnpm mock:meetingbaas",
+    "dev:mock": "cross-env MEETING_BAAS_BASE_URL=http://127.0.0.1:${MOCK_PORT:-4010} pnpm dev"
   },
   "author": "",
   "license": "ISC",

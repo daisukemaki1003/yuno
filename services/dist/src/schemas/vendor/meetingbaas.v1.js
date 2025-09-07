@@ -24,24 +24,6 @@ export const VendorAddBotResponseSchema = z.object({
     return { ...data, botId };
 });
 /**
- * Bot status response schema
- * Maps vendor status strings to our domain model
- */
-export const VendorBotStatusResponseSchema = z.object({
-    // Status could be in different fields
-    status: z.string().optional(),
-    state: z.string().optional(),
-    bot_status: z.string().optional(),
-    // Capture any additional fields
-}).passthrough().transform((data) => {
-    // Find the status field
-    const status = data.status || data.state || data.bot_status;
-    if (!status) {
-        throw new Error('No status field found in response');
-    }
-    return { ...data, status };
-});
-/**
  * Generic vendor error schema
  */
 export const VendorErrorSchema = z.object({

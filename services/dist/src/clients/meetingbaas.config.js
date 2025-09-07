@@ -29,10 +29,6 @@ export function meetingBaasConfig() {
                 method: 'DELETE',
                 path: `/bots/:botId`, // DELETE /bots/{id}
             },
-            botStatus: {
-                method: 'GET',
-                path: `/bots/:botId`,
-            },
             stream: {
                 protocol: streamProtocol,
                 path: `/bots/:botId/transcription`, // Actual Meeting BaaS streaming path
