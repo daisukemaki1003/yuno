@@ -1,8 +1,8 @@
-import { HttpClient } from './http.client.js';
-import { Logger } from '@/utils/logger.js';
-import { badRequest, internal } from '@/utils/errors.js';
-import { VendorAddBotResponseSchema, VendorBotStatusResponseSchema, parseVendorStreamEvent, VendorAudioEventSchema, VendorTranscriptEventSchema, } from '@/schemas/vendor/meetingbaas.v1.js';
-import { createParser } from 'eventsource-parser';
+import { HttpClient } from "./http.client.js";
+import { Logger } from "@/utils/logger.js";
+import { badRequest, internal } from "@/utils/errors.js";
+import { VendorAddBotResponseSchema, VendorBotStatusResponseSchema, parseVendorStreamEvent, VendorAudioEventSchema, VendorTranscriptEventSchema, } from "@/schemas/vendor/meetingbaas.v1.js";
+import { createParser } from "eventsource-parser";
 /**
  * Create Meeting BaaS adapter with given configuration
  * @param cfg - Meeting BaaS configuration
@@ -24,22 +24,30 @@ class MeetingBaasAdapterV1 {
     constructor(config, apiKey) {
         this.config = config;
         this.apiKey = apiKey;
-        this.logger = new Logger('meeting-baas-adapter');
+        this.logger = new Logger("meeting-baas-adapter");
         this.http = new HttpClient(this.logger);
     }
     async addBot(meetingUrl, botName) {
         const url = this.buildUrl(this.config.endpoints.addBot.path, {});
         const headers = this.buildHeaders();
         const requestBody = {
-            bot_name: botName || 'Meeting Bot',
+            bot_name: botName || "Meeting Bot",
             meeting_url: meetingUrl,
             reserved: false,
-            // Add other optional fields as needed
+            recording_mode: "speaker_view",
+            entry_message: "I am a good meeting bot :)",
+            speech_to_text: {
+                provider: "Default",
+            },
             automatic_leave: {
-                noone_joined_timeout: 0,
-                waiting_room_timeout: 0
-            }
+                waiting_room_timeout: 600,
+            },
         };
+        console.log("================================================");
+        console.log("requestBody", requestBody);
+        console.log("url", url);
+        console.log("headers", headers);
+        console.log("================================================");
         try {
             const response = await this.http.fetchJson(url, {
                 method: this.config.endpoints.addBot.method,
@@ -51,7 +59,7 @@ class MeetingBaasAdapterV1 {
             return { botId: parsed.botId };
         }
         catch (err) {
-            this.logger.error('Failed to add bot', { meetingUrl, botName, error: err });
+            this.logger.error("Failed to add bot", { meetingUrl, botName, error: err });
             throw this.mapError(err);
         }
     }
@@ -62,12 +70,12 @@ class MeetingBaasAdapterV1 {
             await this.http.fetchJson(url, {
                 method: this.config.endpoints.leaveBot.method,
                 headers,
-                body: this.config.endpoints.leaveBot.method === 'POST' ? { meetingId } : undefined,
+                body: this.config.endpoints.leaveBot.method === "POST" ? { meetingId } : undefined,
                 timeoutMs: this.config.timeouts.requestMs,
             });
         }
         catch (err) {
-            this.logger.error('Failed to leave bot', { meetingId, botId, error: err });
+            this.logger.error("Failed to leave bot", { meetingId, botId, error: err });
             throw this.mapError(err);
         }
     }
@@ -85,7 +93,7 @@ class MeetingBaasAdapterV1 {
             return { status: domainStatus };
         }
         catch (err) {
-            this.logger.error('Failed to get bot status', { botId, error: err });
+            this.logger.error("Failed to get bot status", { botId, error: err });
             throw this.mapError(err);
         }
     }
@@ -94,7 +102,7 @@ class MeetingBaasAdapterV1 {
         const headers = this.buildHeaders();
         const normalized = opts?.normalized ?? false;
         try {
-            if (this.config.endpoints.stream.protocol === 'sse') {
+            if (this.config.endpoints.stream.protocol === "sse") {
                 const stream = await this.http.openSse(url, headers, this.config.timeouts.streamMs);
                 return this.createSseRecordingStream(stream, normalized);
             }
@@ -105,7 +113,7 @@ class MeetingBaasAdapterV1 {
             }
         }
         catch (err) {
-            this.logger.error('Failed to open recording stream', { meetingId, error: err });
+            this.logger.error("Failed to open recording stream", { meetingId, error: err });
             throw this.mapError(err);
         }
     }
@@ -128,16 +136,16 @@ class MeetingBaasAdapterV1 {
         // Add auth header if not using query param
         if (!this.config.auth.queryParam) {
             const scheme = this.config.auth.scheme;
-            if (scheme === 'Bearer') {
+            if (scheme === "Bearer") {
                 headers[this.config.auth.header] = `Bearer ${this.apiKey}`;
             }
-            else if (scheme === 'ApiKey') {
+            else if (scheme === "ApiKey") {
                 headers[this.config.auth.header] = `ApiKey ${this.apiKey}`;
             }
-            else if (scheme === 'Basic') {
+            else if (scheme === "Basic") {
                 headers[this.config.auth.header] = `Basic ${this.apiKey}`;
             }
-            else if (scheme === 'None') {
+            else if (scheme === "None") {
                 headers[this.config.auth.header] = this.apiKey;
             }
         }
@@ -146,23 +154,23 @@ class MeetingBaasAdapterV1 {
     mapStatus(vendorStatus) {
         const mapped = this.config.maps.status[vendorStatus];
         if (!mapped) {
-            this.logger.warn('Unknown vendor status', { vendorStatus });
-            return 'error';
+            this.logger.warn("Unknown vendor status", { vendorStatus });
+            return "error";
         }
         return mapped;
     }
     mapError(err) {
         if (err instanceof Error) {
             // Check if it's an HTTP error with details
-            if ('details' in err && typeof err.details === 'object' && err.details) {
+            if ("details" in err && typeof err.details === "object" && err.details) {
                 const details = err.details;
                 if (details.status === 400) {
-                    return badRequest('VENDOR_ERROR', err.message, details);
+                    return badRequest("VENDOR_ERROR", err.message, details);
                 }
             }
             return err;
         }
-        return internal('UNKNOWN_ERROR', 'An unknown error occurred');
+        return internal("UNKNOWN_ERROR", "An unknown error occurred");
     }
     createSseRecordingStream(stream, normalized) {
         const handlers = {
@@ -177,23 +185,29 @@ class MeetingBaasAdapterV1 {
                     try {
                         const data = JSON.parse(event.data);
                         const frame = this.parseStreamEvent(data, normalized);
-                        handlers.data.forEach(h => h(frame));
+                        handlers.data.forEach((h) => h(frame));
                     }
                     catch (err) {
-                        this.logger.error('Failed to parse SSE event', { error: err });
-                        handlers.error.forEach(h => h(err));
+                        this.logger.error("Failed to parse SSE event", { error: err });
+                        handlers.error.forEach((h) => h(err));
                     }
                 }
             },
         });
-        stream.on('data', (data) => parser.feed(data));
-        stream.on('error', (err) => handlers.error.forEach(h => h(err)));
-        stream.on('close', () => handlers.close.forEach(h => h()));
+        stream.on("data", (data) => parser.feed(data));
+        stream.on("error", (err) => handlers.error.forEach((h) => h(err)));
+        stream.on("close", () => handlers.close.forEach((h) => h()));
         return {
             close: () => stream.close(),
-            onData: (cb) => { handlers.data.add(cb); },
-            onError: (cb) => { handlers.error.add(cb); },
-            onClose: (cb) => { handlers.close.add(cb); },
+            onData: (cb) => {
+                handlers.data.add(cb);
+            },
+            onError: (cb) => {
+                handlers.error.add(cb);
+            },
+            onClose: (cb) => {
+                handlers.close.add(cb);
+            },
         };
     }
     createWsRecordingStream(stream, normalized) {
@@ -202,24 +216,30 @@ class MeetingBaasAdapterV1 {
             error: new Set(),
             close: new Set(),
         };
-        stream.on('data', (data) => {
+        stream.on("data", (data) => {
             try {
                 const parsed = JSON.parse(data);
                 const frame = this.parseStreamEvent(parsed, normalized);
-                handlers.data.forEach(h => h(frame));
+                handlers.data.forEach((h) => h(frame));
             }
             catch (err) {
-                this.logger.error('Failed to parse WebSocket message', { error: err });
-                handlers.error.forEach(h => h(err));
+                this.logger.error("Failed to parse WebSocket message", { error: err });
+                handlers.error.forEach((h) => h(err));
             }
         });
-        stream.on('error', (err) => handlers.error.forEach(h => h(err)));
-        stream.on('close', () => handlers.close.forEach(h => h()));
+        stream.on("error", (err) => handlers.error.forEach((h) => h(err)));
+        stream.on("close", () => handlers.close.forEach((h) => h()));
         return {
             close: () => stream.close(),
-            onData: (cb) => { handlers.data.add(cb); },
-            onError: (cb) => { handlers.error.add(cb); },
-            onClose: (cb) => { handlers.close.add(cb); },
+            onData: (cb) => {
+                handlers.data.add(cb);
+            },
+            onError: (cb) => {
+                handlers.error.add(cb);
+            },
+            onClose: (cb) => {
+                handlers.close.add(cb);
+            },
         };
     }
     parseStreamEvent(data, normalized) {
@@ -227,7 +247,7 @@ class MeetingBaasAdapterV1 {
         // In non-normalized mode, pass through as generic event
         if (!normalized) {
             return {
-                kind: 'event',
+                kind: "event",
                 ts: timestamp,
                 name: eventType,
                 payload: raw,
@@ -237,16 +257,16 @@ class MeetingBaasAdapterV1 {
         // In normalized mode, try to parse specific event types
         const maps = this.config.maps.streamEvent;
         // Check if it's an audio event
-        if (eventType === 'audio' || eventType === 'audio_data') {
+        if (eventType === "audio" || eventType === "audio_data") {
             try {
                 const parsed = VendorAudioEventSchema.parse(raw);
-                const audioData = parsed[maps?.audioField || 'audio'] || parsed.data;
+                const audioData = parsed[maps?.audioField || "audio"] || parsed.data;
                 if (audioData) {
                     // Convert audio data to Uint8Array
                     let bytes;
-                    if (typeof audioData === 'string') {
+                    if (typeof audioData === "string") {
                         // Base64 encoded
-                        bytes = Uint8Array.from(atob(audioData), c => c.charCodeAt(0));
+                        bytes = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0));
                     }
                     else if (audioData instanceof ArrayBuffer) {
                         bytes = new Uint8Array(audioData);
@@ -257,7 +277,7 @@ class MeetingBaasAdapterV1 {
                     else {
                         // Unknown format, pass as event
                         return {
-                            kind: 'event',
+                            kind: "event",
                             ts: timestamp,
                             name: eventType,
                             payload: raw,
@@ -265,42 +285,54 @@ class MeetingBaasAdapterV1 {
                         };
                     }
                     return {
-                        kind: 'audio',
+                        kind: "audio",
                         ts: timestamp,
                         bytes,
-                        codec: typeof parsed.codec === 'string' ? parsed.codec : undefined,
+                        codec: typeof parsed.codec === "string" ? parsed.codec : undefined,
                         vendorRaw: raw,
                     };
                 }
             }
             catch (err) {
-                this.logger.warn('Failed to parse audio event', { error: err });
+                this.logger.warn("Failed to parse audio event", { error: err });
             }
         }
         // Check if it's a transcript event
-        if (eventType === 'transcript' || eventType === 'transcription' || eventType === 'speech_to_text') {
+        if (eventType === "transcript" ||
+            eventType === "transcription" ||
+            eventType === "speech_to_text") {
             try {
                 const parsed = VendorTranscriptEventSchema.parse(raw);
-                const textFieldValue = parsed[maps?.textField || 'text'] || parsed.transcript;
-                const text = typeof textFieldValue === 'string' ? textFieldValue : '';
+                const textFieldValue = parsed[maps?.textField || "text"] || parsed.transcript;
+                const text = typeof textFieldValue === "string" ? textFieldValue : "";
                 if (text) {
                     return {
-                        kind: 'transcript',
+                        kind: "transcript",
                         ts: timestamp,
                         text,
-                        lang: typeof parsed.lang === 'string' ? parsed.lang : typeof parsed.language === 'string' ? parsed.language : undefined,
-                        isFinal: typeof parsed.is_final === 'boolean' ? parsed.is_final : typeof parsed.isFinal === 'boolean' ? parsed.isFinal : typeof parsed.final === 'boolean' ? parsed.final : undefined,
+                        lang: typeof parsed.lang === "string"
+                            ? parsed.lang
+                            : typeof parsed.language === "string"
+                                ? parsed.language
+                                : undefined,
+                        isFinal: typeof parsed.is_final === "boolean"
+                            ? parsed.is_final
+                            : typeof parsed.isFinal === "boolean"
+                                ? parsed.isFinal
+                                : typeof parsed.final === "boolean"
+                                    ? parsed.final
+                                    : undefined,
                         vendorRaw: raw,
                     };
                 }
             }
             catch (err) {
-                this.logger.warn('Failed to parse transcript event', { error: err });
+                this.logger.warn("Failed to parse transcript event", { error: err });
             }
         }
         // Default: pass through as generic event
         return {
-            kind: 'event',
+            kind: "event",
             ts: timestamp,
             name: eventType,
             payload: raw,

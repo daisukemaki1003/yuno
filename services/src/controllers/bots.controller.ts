@@ -33,7 +33,7 @@ export async function addBot(c: Context): Promise<Response> {
   const logger = c.get("logger") as Logger;
   const apiKey = c.get("meetingBaasApiKey") as string;
 
-  logger.info("\n\n===================== addBot =====================\n\n");
+  logger.info("===================== addBot =====================");
 
   // Check idempotency key
   const idempotencyKey = c.req.header("Idempotency-Key");

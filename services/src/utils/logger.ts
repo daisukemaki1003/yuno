@@ -1,10 +1,10 @@
-import { randomUUID } from 'crypto';
-import type { Context } from 'hono';
+import { randomUUID } from "crypto";
+import type { Context } from "hono";
 
 /**
  * Log levels
  */
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogLevel = "debug" | "info" | "warn" | "error";
 
 /**
  * Log metadata type
@@ -32,7 +32,7 @@ export class Logger {
   private requestId: string;
   private service: string;
 
-  constructor(requestId: string, service = 'cloud-functions') {
+  constructor(requestId: string, service = "cloud-functions") {
     this.requestId = requestId;
     this.service = service;
   }
@@ -42,13 +42,13 @@ export class Logger {
    */
   static withRequest(ctx: Context | Request): Logger {
     let requestId: string | undefined;
-    
-    if ('req' in ctx) {
+
+    if ("req" in ctx) {
       // Hono context
-      requestId = ctx.req.header('X-Request-Id');
+      requestId = ctx.req.header("X-Request-Id");
     } else if (ctx instanceof Request) {
       // Standard Request object
-      requestId = ctx.headers.get('X-Request-Id') || undefined;
+      requestId = ctx.headers.get("X-Request-Id") || undefined;
     }
 
     return new Logger(requestId || randomUUID());
@@ -70,13 +70,13 @@ export class Logger {
     // Use appropriate console method based on level
     const output = JSON.stringify(entry);
     switch (level) {
-      case 'error':
+      case "error":
         console.error(output);
         break;
-      case 'warn':
+      case "warn":
         console.warn(output);
         break;
-      case 'debug':
+      case "debug":
         console.debug(output);
         break;
       default:
@@ -85,19 +85,19 @@ export class Logger {
   }
 
   debug(msg: string, meta?: LogMeta): void {
-    this.log('debug', msg, meta);
+    this.log("debug", msg, meta);
   }
 
   info(msg: string, meta?: LogMeta): void {
-    this.log('info', msg, meta);
+    this.log("info", msg, meta);
   }
 
   warn(msg: string, meta?: LogMeta): void {
-    this.log('warn', msg, meta);
+    this.log("warn", msg, meta);
   }
 
   error(msg: string, meta?: LogMeta): void {
-    this.log('error', msg, meta);
+    this.log("error", msg, meta);
   }
 }
 

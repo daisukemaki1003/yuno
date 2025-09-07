@@ -9,16 +9,18 @@ import { z } from 'zod';
  */
 export const VendorAddBotResponseSchema = z.object({
     // Different vendors might use different field names
-    id: z.string().optional(),
-    botId: z.string().optional(),
-    bot_id: z.string().optional(),
+    id: z.union([z.string(), z.number()]).optional(),
+    botId: z.union([z.string(), z.number()]).optional(),
+    bot_id: z.union([z.string(), z.number()]).optional(),
     // Capture any additional fields
 }).passthrough().transform((data) => {
     // Normalize different field names to botId
-    const botId = data.botId || data.bot_id || data.id;
-    if (!botId) {
+    const botIdValue = data.botId || data.bot_id || data.id;
+    if (!botIdValue) {
         throw new Error('No bot ID field found in response');
     }
+    // Convert to string if it's a number
+    const botId = String(botIdValue);
     return { ...data, botId };
 });
 /**

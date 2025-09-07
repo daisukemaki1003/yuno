@@ -1,11 +1,11 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from "crypto";
 /**
  * Logger class for structured logging
  */
 export class Logger {
     requestId;
     service;
-    constructor(requestId, service = 'cloud-functions') {
+    constructor(requestId, service = "cloud-functions") {
         this.requestId = requestId;
         this.service = service;
     }
@@ -14,13 +14,13 @@ export class Logger {
      */
     static withRequest(ctx) {
         let requestId;
-        if ('req' in ctx) {
+        if ("req" in ctx) {
             // Hono context
-            requestId = ctx.req.header('X-Request-Id');
+            requestId = ctx.req.header("X-Request-Id");
         }
         else if (ctx instanceof Request) {
             // Standard Request object
-            requestId = ctx.headers.get('X-Request-Id') || undefined;
+            requestId = ctx.headers.get("X-Request-Id") || undefined;
         }
         return new Logger(requestId || randomUUID());
     }
@@ -39,13 +39,13 @@ export class Logger {
         // Use appropriate console method based on level
         const output = JSON.stringify(entry);
         switch (level) {
-            case 'error':
+            case "error":
                 console.error(output);
                 break;
-            case 'warn':
+            case "warn":
                 console.warn(output);
                 break;
-            case 'debug':
+            case "debug":
                 console.debug(output);
                 break;
             default:
@@ -53,16 +53,16 @@ export class Logger {
         }
     }
     debug(msg, meta) {
-        this.log('debug', msg, meta);
+        this.log("debug", msg, meta);
     }
     info(msg, meta) {
-        this.log('info', msg, meta);
+        this.log("info", msg, meta);
     }
     warn(msg, meta) {
-        this.log('warn', msg, meta);
+        this.log("warn", msg, meta);
     }
     error(msg, meta) {
-        this.log('error', msg, meta);
+        this.log("error", msg, meta);
     }
 }
 /**
