@@ -37,18 +37,18 @@ export async function addBot(c) {
     if (!validationResult.success) {
         throw badRequest('INVALID_ARGUMENT', validationResult.error.issues[0].message);
     }
-    const { userId, meetingId, options } = validationResult.data;
-    logger.info('Adding bot to meeting', { userId, meetingId, options });
+    const { userId, meetingUrl, botName, options } = validationResult.data;
+    logger.info('Adding bot to meeting', { userId, meetingUrl, botName, options });
     try {
         // Get Meeting BaaS client for user
         const baas = await getMeetingBaasForUser(userId, apiKey);
         // Add bot to meeting
-        const result = await baas.addBot(meetingId);
+        const result = await baas.addBot(meetingUrl, botName);
         // Get initial status
         const statusResult = await baas.getBotStatus(result.botId);
         const response = {
             botId: result.botId,
-            meetingId,
+            meetingId: meetingUrl, // Using meetingUrl for backward compatibility
             status: statusResult.status,
         };
         // Cache response if idempotency key provided

@@ -18,14 +18,14 @@ curl -X POST http://localhost:8080/v1/bots \
   -H "Authorization: Bearer test" \
   -H "X-MeetingBaas-ApiKey: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"userId":"u_123","meetingId":"m_abc","options":{"language":"ja-JP"}}'
+  -d '{"userId":"u_123","meetingUrl":"https://meet.google.com/abc-defg-hij","botName":"My Meeting Bot","options":{"language":"ja-JP"}}'
 ```
 
 Expected response:
 ```json
 {
   "botId": "bot_456",
-  "meetingId": "m_abc",
+  "meetingId": "https://meet.google.com/abc-defg-hij",
   "status": "joining"
 }
 ```
@@ -117,7 +117,7 @@ curl -X POST http://localhost:8080/v1/bots \
   -H "Authorization: Bearer test" \
   -H "X-MeetingBaas-ApiKey: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"userId":""}'
+  -d '{"userId":"u_123","meetingUrl":"not-a-url"}'
 ```
 
 Expected: 400 Bad Request with validation error
@@ -131,7 +131,7 @@ curl -X POST http://localhost:8080/v1/bots \
   -H "X-MeetingBaas-ApiKey: YOUR_API_KEY" \
   -H "Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Content-Type: application/json" \
-  -d '{"userId":"u_123","meetingId":"m_abc"}'
+  -d '{"userId":"u_123","meetingUrl":"https://meet.google.com/abc-defg-hij","botName":"Test Bot"}'
 
 # Second request with same Idempotency-Key (within 5 minutes)
 curl -X POST http://localhost:8080/v1/bots \
@@ -139,7 +139,7 @@ curl -X POST http://localhost:8080/v1/bots \
   -H "X-MeetingBaas-ApiKey: YOUR_API_KEY" \
   -H "Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Content-Type: application/json" \
-  -d '{"userId":"u_123","meetingId":"m_abc"}'
+  -d '{"userId":"u_123","meetingUrl":"https://meet.google.com/abc-defg-hij","botName":"Test Bot"}'
 ```
 
 Expected: Same response for both requests

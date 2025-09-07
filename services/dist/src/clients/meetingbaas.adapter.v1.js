@@ -27,21 +27,31 @@ class MeetingBaasAdapterV1 {
         this.logger = new Logger('meeting-baas-adapter');
         this.http = new HttpClient(this.logger);
     }
-    async addBot(meetingId) {
-        const url = this.buildUrl(this.config.endpoints.addBot.path, { meetingId });
+    async addBot(meetingUrl, botName) {
+        const url = this.buildUrl(this.config.endpoints.addBot.path, {});
         const headers = this.buildHeaders();
+        const requestBody = {
+            bot_name: botName || 'Meeting Bot',
+            meeting_url: meetingUrl,
+            reserved: false,
+            // Add other optional fields as needed
+            automatic_leave: {
+                noone_joined_timeout: 0,
+                waiting_room_timeout: 0
+            }
+        };
         try {
             const response = await this.http.fetchJson(url, {
                 method: this.config.endpoints.addBot.method,
                 headers,
-                body: { meetingId },
+                body: requestBody,
                 timeoutMs: this.config.timeouts.requestMs,
             });
             const parsed = VendorAddBotResponseSchema.parse(response);
             return { botId: parsed.botId };
         }
         catch (err) {
-            this.logger.error('Failed to add bot', { meetingId, error: err });
+            this.logger.error('Failed to add bot', { meetingUrl, botName, error: err });
             throw this.mapError(err);
         }
     }

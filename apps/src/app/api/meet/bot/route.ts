@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
         bot_name: body.botName,
         reserved: false,
         recording_mode: "speaker_view",
-        bot_image: "https://example.com/bot.jpg",
+        // bot_image: "https://example.com/bot.jpg",
         entry_message: "I am a good meeting bot :)",
         speech_to_text: {
           provider: "Default",
@@ -102,14 +102,14 @@ export async function POST(req: NextRequest) {
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
       console.error("Meeting BaaS API error:", response.status, errorData);
-      
+
       if (response.status === 401) {
         return NextResponse.json(
           { error: "API キーが無効です" },
           { status: 401 }
         );
       }
-      
+
       return NextResponse.json(
         { error: errorData?.message || "ボットの作成に失敗しました" },
         { status: response.status }
@@ -119,12 +119,14 @@ export async function POST(req: NextRequest) {
     const data = await response.json();
 
     // 成功レスポンス
-    return NextResponse.json({
-      botId: data.bot_id,
-      inputWsUrl: data.input_ws_url,
-      outputWsUrl: data.output_ws_url,
-    }, { status: 200 });
-    
+    return NextResponse.json(
+      {
+        botId: data.bot_id,
+        inputWsUrl: data.input_ws_url,
+        outputWsUrl: data.output_ws_url,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Error creating bot:", error);
     return NextResponse.json(

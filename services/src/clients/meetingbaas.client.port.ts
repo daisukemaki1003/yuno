@@ -37,10 +37,11 @@ export interface RecordingStream {
 export interface MeetingBaasPort {
   /**
    * Add a bot to a meeting
-   * @param meetingId - The meeting to join
+   * @param meetingUrl - The meeting URL to join
+   * @param botName - The name of the bot
    * @returns Bot identifier
    */
-  addBot(meetingId: MeetingId): Promise<{ botId: BotId }>;
+  addBot(meetingUrl: string, botName?: string): Promise<{ botId: BotId }>;
 
   /**
    * Remove a bot from a meeting

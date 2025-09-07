@@ -103,8 +103,8 @@ export type MeetingBaasConfig = {
  * This function builds the configuration from env vars
  */
 export function meetingBaasConfig(): MeetingBaasConfig {
-  const authHeader = env.MEETING_BAAS_AUTH_HEADER || 'Authorization';
-  const authScheme = (env.MEETING_BAAS_AUTH_SCHEME as MeetingBaasConfig['auth']['scheme']) || 'Bearer';
+  const authHeader = env.MEETING_BAAS_AUTH_HEADER || 'x-meeting-baas-api-key';
+  const authScheme = (env.MEETING_BAAS_AUTH_SCHEME as MeetingBaasConfig['auth']['scheme']) || 'None';
   const apiVersion = env.MEETING_BAAS_API_VERSION || 'v1';
   const streamProtocol = (env.MEETING_BAAS_STREAM_PROTOCOL as 'ws' | 'sse') || 'sse';
 
@@ -123,32 +123,33 @@ export function meetingBaasConfig(): MeetingBaasConfig {
     endpoints: {
       addBot: {
         method: 'POST',
-        path: `/${apiVersion}/bots`, // Default path, vendor may differ
+        path: `/bots/`, // Meeting BaaS actual path
       },
       leaveBot: {
-        method: 'POST',
-        path: `/${apiVersion}/bots/:botId/leave`, // :botId will be replaced
+        method: 'DELETE',
+        path: `/bots/:botId`, // DELETE /bots/{id}
       },
       botStatus: {
         method: 'GET',
-        path: `/${apiVersion}/bots/:botId`,
+        path: `/bots/:botId`,
       },
       stream: {
         protocol: streamProtocol,
-        path: `/${apiVersion}/meetings/:meetingId/recording`,
+        path: `/bots/:botId/transcription`, // Actual Meeting BaaS streaming path
       },
     },
     maps: {
-      // Default vendor status mapping (adjust per vendor)
+      // Meeting BaaS status mapping
       status: {
-        'JOINING': 'joining',
-        'ACTIVE': 'joined',
-        'CONNECTED': 'joined',
-        'LEAVING': 'leaving',
-        'DISCONNECTED': 'left',
-        'LEFT': 'left',
-        'ERROR': 'error',
-        'FAILED': 'error',
+        'created': 'joining',
+        'joining': 'joining',
+        'joined': 'joined',
+        'ready': 'joined',
+        'leaving': 'leaving',
+        'left': 'left',
+        'error': 'error',
+        'failed': 'error',
+        'unknown': 'error',
       },
       // Stream event field mappings (adjust per vendor)
       streamEvent: {

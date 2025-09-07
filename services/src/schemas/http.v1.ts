@@ -12,7 +12,8 @@ export const BotIdSchema = z.string().min(1, 'botId is required');
 // POST /v1/bots request
 export const AddBotRequestSchema = z.object({
   userId: UserIdSchema,
-  meetingId: MeetingIdSchema,
+  meetingUrl: z.string().url('meetingUrl must be a valid URL'),
+  botName: z.string().optional().default('Meeting Bot'),
   options: z.object({
     language: z.string().optional(),
     model: z.string().optional(),
