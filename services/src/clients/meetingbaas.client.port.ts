@@ -4,7 +4,7 @@
  * Vendor implementations should adapt to this interface
  */
 
-import type { MeetingId, BotId, BotStatus, RecordingFrame } from './meetingbaas.client.types.js';
+import type { MeetingId, BotId, RecordingFrame } from './meetingbaas.client.types.js';
 
 /**
  * Recording stream interface for real-time data
@@ -49,13 +49,6 @@ export interface MeetingBaasPort {
    * @param botId - The bot to remove
    */
   leaveBot(meetingId: MeetingId, botId: BotId): Promise<void>;
-
-  /**
-   * Get bot status
-   * @param botId - The bot identifier
-   * @returns Current bot status
-   */
-  getBotStatus(botId: BotId): Promise<{ status: BotStatus }>;
 
   /**
    * Open a recording stream for a meeting

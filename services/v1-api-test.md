@@ -30,25 +30,7 @@ Expected response:
 }
 ```
 
-### 2. Get Bot Status
-
-```bash
-curl "http://localhost:8080/v1/bots/bot_456/status?userId=u_123" \
-  -H "Authorization: Bearer test" \
-  -H "X-MeetingBaas-ApiKey: YOUR_API_KEY"
-```
-
-Expected response:
-```json
-{
-  "botId": "bot_456",
-  "status": "joined",
-  "meetingId": "m_abc",
-  "vendorRaw": {}
-}
-```
-
-### 3. Remove Bot from Meeting
+### 2. Remove Bot from Meeting
 
 ```bash
 curl -X DELETE "http://localhost:8080/v1/bots/bot_456?userId=u_123" \
@@ -58,7 +40,7 @@ curl -X DELETE "http://localhost:8080/v1/bots/bot_456?userId=u_123" \
 
 Expected response: 204 No Content
 
-### 4. Recording Stream (SSE)
+### 3. Recording Stream (SSE)
 
 Raw mode (default):
 ```bash

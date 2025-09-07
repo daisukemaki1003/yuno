@@ -40,25 +40,6 @@ export const LeaveBotQuerySchema = z.object({
   userId: UserIdSchema,
 });
 
-// GET /v1/bots/:botId/status params & query
-export const GetBotStatusParamsSchema = z.object({
-  botId: BotIdSchema,
-});
-
-export const GetBotStatusQuerySchema = z.object({
-  userId: UserIdSchema,
-});
-
-// GET /v1/bots/:botId/status response
-export const GetBotStatusResponseSchema = z.object({
-  botId: BotIdSchema,
-  status: z.string(),
-  meetingId: MeetingIdSchema,
-  vendorRaw: z.unknown().optional(),
-});
-
-export type GetBotStatusResponse = z.infer<typeof GetBotStatusResponseSchema>;
-
 // GET /v1/meetings/:meetingId/stream params & query
 export const StreamParamsSchema = z.object({
   meetingId: MeetingIdSchema,

@@ -1,12 +1,11 @@
 import type { MeetingBaasPort, RecordingStream } from "./meetingbaas.client.port.js";
-import type { MeetingId, BotId, BotStatus, RecordingFrame } from "./meetingbaas.client.types.js";
+import type { MeetingId, BotId, RecordingFrame } from "./meetingbaas.client.types.js";
 import type { MeetingBaasConfig } from "./meetingbaas.config.js";
 import { HttpClient, SseStream, WsStream } from "./http.client.js";
 import { Logger } from "@/utils/logger.js";
 import { badRequest, internal } from "@/utils/errors.js";
 import {
   VendorAddBotResponseSchema,
-  VendorBotStatusResponseSchema,
   parseVendorStreamEvent,
   VendorAudioEventSchema,
   VendorTranscriptEventSchema,
@@ -58,12 +57,6 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       },
     };
 
-    console.log("================================================");
-    console.log("requestBody", requestBody);
-    console.log("url", url);
-    console.log("headers", headers);
-    console.log("================================================");
-
     try {
       const response = await this.http.fetchJson(url, {
         method: this.config.endpoints.addBot.method,
@@ -93,27 +86,6 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       });
     } catch (err) {
       this.logger.error("Failed to leave bot", { meetingId, botId, error: err });
-      throw this.mapError(err);
-    }
-  }
-
-  async getBotStatus(botId: BotId): Promise<{ status: BotStatus }> {
-    const url = this.buildUrl(this.config.endpoints.botStatus.path, { botId });
-    const headers = this.buildHeaders();
-
-    try {
-      const response = await this.http.fetchJson(url, {
-        method: this.config.endpoints.botStatus.method,
-        headers,
-        timeoutMs: this.config.timeouts.requestMs,
-      });
-
-      const parsed = VendorBotStatusResponseSchema.parse(response);
-      const domainStatus = this.mapStatus(parsed.status);
-
-      return { status: domainStatus };
-    } catch (err) {
-      this.logger.error("Failed to get bot status", { botId, error: err });
       throw this.mapError(err);
     }
   }
@@ -178,15 +150,6 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
     }
 
     return headers;
-  }
-
-  private mapStatus(vendorStatus: string): BotStatus {
-    const mapped = this.config.maps.status[vendorStatus];
-    if (!mapped) {
-      this.logger.warn("Unknown vendor status", { vendorStatus });
-      return "error";
-    }
-    return mapped;
   }
 
   private mapError(err: unknown): Error {

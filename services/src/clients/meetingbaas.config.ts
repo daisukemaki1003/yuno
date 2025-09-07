@@ -66,11 +66,6 @@ export type MeetingBaasConfig = {
     leaveBot: { method: 'POST' | 'DELETE'; path: string };
     
     /**
-     * Get bot status endpoint
-     */
-    botStatus: { method: 'GET'; path: string };
-    
-    /**
      * Recording stream endpoint
      */
     stream: { protocol: 'ws' | 'sse'; path: string };
@@ -128,10 +123,6 @@ export function meetingBaasConfig(): MeetingBaasConfig {
       leaveBot: {
         method: 'DELETE',
         path: `/bots/:botId`, // DELETE /bots/{id}
-      },
-      botStatus: {
-        method: 'GET',
-        path: `/bots/:botId`,
       },
       stream: {
         protocol: streamProtocol,

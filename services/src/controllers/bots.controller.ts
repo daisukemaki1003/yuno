@@ -4,10 +4,7 @@ import {
   AddBotRequestSchema,
   LeaveBotParamsSchema,
   LeaveBotQuerySchema,
-  GetBotStatusParamsSchema,
-  GetBotStatusQuerySchema,
   type AddBotResponse,
-  type GetBotStatusResponse,
 } from "@/schemas/http.v1.js";
 import { badRequest, notFound, internal } from "@/utils/errors.js";
 import type { Logger } from "@/utils/logger.js";
@@ -69,13 +66,10 @@ export async function addBot(c: Context): Promise<Response> {
 
     logger.info("result", { result });
 
-    // Get initial status
-    const statusResult = await baas.getBotStatus(result.botId);
-
     const response: AddBotResponse = {
       botId: result.botId,
       meetingId: meetingUrl, // Using meetingUrl for backward compatibility
-      status: statusResult.status,
+      status: "joining", // Default status since we can't get it from API
     };
 
     logger.info("response", { response });
@@ -88,7 +82,7 @@ export async function addBot(c: Context): Promise<Response> {
       });
     }
 
-    logger.info("Bot added successfully", { botId: result.botId, status: statusResult.status });
+    logger.info("Bot added successfully", { botId: result.botId, status: "joining" });
 
     return c.json(response);
   } catch (err) {
@@ -136,9 +130,6 @@ export async function leaveBot(c: Context): Promise<Response> {
     // Get Meeting BaaS client for user
     const baas = await getMeetingBaasForUser(userId, apiKey);
 
-    // Get bot info first to get meetingId
-    const statusResult = await baas.getBotStatus(botId);
-
     // Leave bot
     // Note: We need meetingId for the leave operation
     // In a real implementation, we might store bot->meeting mapping
@@ -161,57 +152,3 @@ export async function leaveBot(c: Context): Promise<Response> {
   }
 }
 
-/**
- * Get bot status
- */
-export async function getStatus(c: Context): Promise<Response> {
-  const logger = c.get("logger") as Logger;
-  const apiKey = c.get("meetingBaasApiKey") as string;
-
-  // Validate params
-  const paramsResult = GetBotStatusParamsSchema.safeParse(c.req.param());
-  if (!paramsResult.success) {
-    throw badRequest("INVALID_ARGUMENT", paramsResult.error.issues[0].message);
-  }
-
-  // Validate query
-  const queryResult = GetBotStatusQuerySchema.safeParse(c.req.query());
-  if (!queryResult.success) {
-    throw badRequest("INVALID_ARGUMENT", queryResult.error.issues[0].message);
-  }
-
-  const { botId } = paramsResult.data;
-  const { userId } = queryResult.data;
-
-  logger.info("Getting bot status", { botId, userId });
-
-  try {
-    // Get Meeting BaaS client for user
-    const baas = await getMeetingBaasForUser(userId, apiKey);
-
-    // Get bot status
-    const result = await baas.getBotStatus(botId);
-
-    const response: GetBotStatusResponse = {
-      botId,
-      status: result.status,
-      meetingId: "", // Would need to store bot->meeting mapping
-      // Include vendor raw data if available
-      vendorRaw: (result as any).vendorRaw,
-    };
-
-    logger.info("Bot status retrieved", { botId, status: result.status });
-
-    return c.json(response);
-  } catch (err) {
-    logger.error("Failed to get bot status", { error: err });
-
-    if (err instanceof Error) {
-      if (err.message.includes("not found")) {
-        throw notFound("BOT_NOT_FOUND", "Bot not found");
-      }
-    }
-
-    throw internal("UPSTREAM_ERROR", "Failed to get bot status");
-  }
-}
