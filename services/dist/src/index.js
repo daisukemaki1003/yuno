@@ -4,6 +4,7 @@ import { env } from "@/configs/env.js";
 import { Logger } from "@/utils/logger.js";
 import { errorHandler, notFound } from "@/utils/errors.js";
 import { router } from "@/routes/_router.js";
+import v1Router from "@/routes/v1.router.js";
 // Create Hono app with typed variables
 export const app = new Hono();
 // Request ID middleware - must be first
@@ -33,6 +34,8 @@ app.use("*", async (c, next) => {
 });
 // Mount main router
 app.route("/", router);
+// Mount v1 API routes
+app.route("/v1", v1Router);
 // 404 handler
 app.notFound(() => {
     throw notFound("NOT_FOUND", "Not Found");

@@ -4,11 +4,13 @@ import { env } from "@/configs/env.js";
 import { Logger } from "@/utils/logger.js";
 import { errorHandler, notFound } from "@/utils/errors.js";
 import { router } from "@/routes/_router.js";
+import v1Router from "@/routes/v1.router.js";
 
 // Define context variables type
 type Variables = {
   requestId: string;
   logger: Logger;
+  meetingBaasApiKey?: string;
 };
 
 // Create Hono app with typed variables
@@ -48,6 +50,9 @@ app.use("*", async (c, next) => {
 
 // Mount main router
 app.route("/", router);
+
+// Mount v1 API routes
+app.route("/v1", v1Router);
 
 // 404 handler
 app.notFound(() => {
