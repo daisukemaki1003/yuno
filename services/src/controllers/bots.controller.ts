@@ -30,8 +30,6 @@ export async function addBot(c: Context): Promise<Response> {
   const logger = c.get("logger") as Logger;
   const apiKey = c.get("meetingBaasApiKey") as string;
 
-  logger.info("===================== addBot =====================");
-
   // Check idempotency key
   const idempotencyKey = c.req.header("Idempotency-Key");
   if (idempotencyKey) {
@@ -64,15 +62,13 @@ export async function addBot(c: Context): Promise<Response> {
     // Add bot to meeting
     const result = await baas.addBot(meetingUrl, botName);
 
-    logger.info("result", { result });
-
     const response: AddBotResponse = {
       botId: result.botId,
       meetingId: meetingUrl, // Using meetingUrl for backward compatibility
       status: "joining", // Default status since we can't get it from API
     };
 
-    logger.info("response", { response });
+    logger.info("Add bot response", { response });
 
     // Cache response if idempotency key provided
     if (idempotencyKey) {
@@ -151,4 +147,3 @@ export async function leaveBot(c: Context): Promise<Response> {
     throw internal("UPSTREAM_ERROR", "Failed to remove bot from meeting");
   }
 }
-

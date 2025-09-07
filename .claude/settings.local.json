@@ -6,7 +6,8 @@
       "Bash(pnpm --dir /Users/makidaisuke/Desktop/Projects/yuno/services install)",
       "Bash(pnpm:*)",
       "Bash(npx tsx:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": []
   }
