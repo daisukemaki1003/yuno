@@ -1,0 +1,163 @@
+import { env } from '@/configs/env.js';
+import type { BotStatus } from './meetingbaas.client.types.js';
+
+/**
+ * Meeting BaaS configuration type
+ * This allows vendor-specific details to be configured externally
+ */
+export type MeetingBaasConfig = {
+  /**
+   * Base URL for the Meeting BaaS API
+   */
+  baseUrl: string;
+
+  /**
+   * API version (e.g., 'v1', '2025-09-01')
+   */
+  apiVersion?: string;
+
+  /**
+   * Authentication configuration
+   */
+  auth: {
+    /**
+     * Header name for authentication (e.g., 'Authorization', 'x-api-key')
+     */
+    header: string;
+    
+    /**
+     * Authentication scheme
+     */
+    scheme?: 'Bearer' | 'ApiKey' | 'Basic' | 'None';
+    
+    /**
+     * Query parameter name if auth is passed as query param
+     */
+    queryParam?: string;
+  };
+
+  /**
+   * Timeout configurations
+   */
+  timeouts: {
+    /**
+     * Request timeout in milliseconds
+     */
+    requestMs: number;
+    
+    /**
+     * Stream timeout in milliseconds
+     */
+    streamMs: number;
+  };
+
+  /**
+   * Endpoint configurations
+   */
+  endpoints: {
+    /**
+     * Add bot endpoint
+     */
+    addBot: { method: 'POST'; path: string };
+    
+    /**
+     * Leave bot endpoint
+     */
+    leaveBot: { method: 'POST' | 'DELETE'; path: string };
+    
+    /**
+     * Get bot status endpoint
+     */
+    botStatus: { method: 'GET'; path: string };
+    
+    /**
+     * Recording stream endpoint
+     */
+    stream: { protocol: 'ws' | 'sse'; path: string };
+  };
+
+  /**
+   * Field mappings for normalization
+   */
+  maps: {
+    /**
+     * Map vendor status values to domain status
+     */
+    status: Record<string, BotStatus>;
+    
+    /**
+     * Stream event field mappings (for normalized mode)
+     */
+    streamEvent?: {
+      kindField?: string;      // e.g., 'type', 'event'
+      dataField?: string;      // e.g., 'data', 'payload'
+      audioField?: string;     // e.g., 'audio'
+      textField?: string;      // e.g., 'text'
+      tsField?: string;        // e.g., 'timestamp'
+    };
+  };
+};
+
+/**
+ * Get Meeting BaaS configuration from environment
+ * This function builds the configuration from env vars
+ */
+export function meetingBaasConfig(): MeetingBaasConfig {
+  const authHeader = env.MEETING_BAAS_AUTH_HEADER || 'Authorization';
+  const authScheme = (env.MEETING_BAAS_AUTH_SCHEME as MeetingBaasConfig['auth']['scheme']) || 'Bearer';
+  const apiVersion = env.MEETING_BAAS_API_VERSION || 'v1';
+  const streamProtocol = (env.MEETING_BAAS_STREAM_PROTOCOL as 'ws' | 'sse') || 'sse';
+
+  return {
+    baseUrl: env.MEETING_BAAS_BASE_URL,
+    apiVersion,
+    auth: {
+      header: authHeader,
+      scheme: authScheme,
+      // queryParam: env.MEETING_BAAS_AUTH_QUERY_PARAM, // Uncomment if needed
+    },
+    timeouts: {
+      requestMs: env.MEETING_BAAS_TIMEOUT_REQUEST_MS || 15000,
+      streamMs: env.MEETING_BAAS_TIMEOUT_STREAM_MS || 600000,
+    },
+    endpoints: {
+      addBot: {
+        method: 'POST',
+        path: `/${apiVersion}/bots`, // Default path, vendor may differ
+      },
+      leaveBot: {
+        method: 'POST',
+        path: `/${apiVersion}/bots/:botId/leave`, // :botId will be replaced
+      },
+      botStatus: {
+        method: 'GET',
+        path: `/${apiVersion}/bots/:botId`,
+      },
+      stream: {
+        protocol: streamProtocol,
+        path: `/${apiVersion}/meetings/:meetingId/recording`,
+      },
+    },
+    maps: {
+      // Default vendor status mapping (adjust per vendor)
+      status: {
+        'JOINING': 'joining',
+        'ACTIVE': 'joined',
+        'CONNECTED': 'joined',
+        'LEAVING': 'leaving',
+        'DISCONNECTED': 'left',
+        'LEFT': 'left',
+        'ERROR': 'error',
+        'FAILED': 'error',
+      },
+      // Stream event field mappings (adjust per vendor)
+      streamEvent: {
+        kindField: 'type',
+        dataField: 'data',
+        audioField: 'audio',
+        textField: 'text',
+        tsField: 'timestamp',
+      },
+    },
+  };
+}

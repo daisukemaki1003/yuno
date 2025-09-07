@@ -15,6 +15,24 @@ const envSchema = z.object({
   KMS_KEY_NAME: z.string().min(1, 'KMS_KEY_NAME is required'),
   MEETING_BAAS_BASE_URL: z.string().url('MEETING_BAAS_BASE_URL must be a valid URL'),
   FIRESTORE_EMULATOR_HOST: z.string().optional(),
+  
+  // Meeting BaaS configuration
+  MEETING_BAAS_API_VERSION: z.string().optional(),
+  MEETING_BAAS_AUTH_HEADER: z.string().default('Authorization'),
+  MEETING_BAAS_AUTH_SCHEME: z.enum(['Bearer', 'ApiKey', 'Basic', 'None']).optional(),
+  MEETING_BAAS_TIMEOUT_REQUEST_MS: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0)
+    .optional()
+    .or(z.number().optional()),
+  MEETING_BAAS_TIMEOUT_STREAM_MS: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0)
+    .optional()
+    .or(z.number().optional()),
+  MEETING_BAAS_STREAM_PROTOCOL: z.enum(['ws', 'sse']).optional(),
 });
 
 /**
