@@ -182,6 +182,21 @@ export class HttpClient {
     return new WsStream(ws);
   }
 
+  /**
+   * POST request helper
+   */
+  async post<T = unknown>(
+    url: string,
+    body?: unknown,
+    options?: { headers?: Record<string, string>; timeoutMs?: number; retryCount?: number }
+  ): Promise<T> {
+    return this.fetchJson<T>(url, {
+      method: 'POST',
+      body,
+      ...options,
+    });
+  }
+
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }

@@ -32,7 +32,29 @@ const envSchema = z.object({
     .refine((val) => !isNaN(val) && val > 0)
     .optional()
     .or(z.number().optional()),
-  MEETING_BAAS_STREAM_PROTOCOL: z.enum(['ws', 'sse']).optional(),
+  MEETING_BAAS_STREAM_PROTOCOL: z.enum(['ws', 'sse', 'ws-relay']).optional(),
+
+  // Gladia configuration
+  GLADIA_API_KEY: z.string().optional(),
+  PUBLIC_WS_BASE: z.string().optional(),
+  
+  // WebSocket relay configuration
+  STREAM_RECONNECT_BASE_MS: z
+    .union([
+      z.string().transform((val) => parseInt(val, 10)),
+      z.number()
+    ])
+    .refine((val) => !isNaN(val) && val > 0)
+    .default(5000)
+    .optional(),
+  STREAM_BACKPRESSURE_MAX_BUFFER: z
+    .union([
+      z.string().transform((val) => parseInt(val, 10)),
+      z.number()
+    ])
+    .refine((val) => !isNaN(val) && val > 0)
+    .default(5242880) // 5MB
+    .optional(),
 });
 
 /**
