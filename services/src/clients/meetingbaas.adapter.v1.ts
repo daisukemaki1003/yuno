@@ -55,6 +55,11 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       automatic_leave: {
         waiting_room_timeout: 600,
       },
+      streaming: {
+        audio_frequency: "16khz",
+        input: `${process.env.PUBLIC_WS_BASE}/mb-input`,
+        output: null,
+      },
     };
 
     try {
