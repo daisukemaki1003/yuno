@@ -7,7 +7,8 @@
       "Bash(pnpm:*)",
       "Bash(npx tsx:*)",
       "Bash(rm:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }
