@@ -1,0 +1,109 @@
+ありがとうございます！共有ドキュメント、めちゃくちゃ助かりました。
+いただいた監査レポート前提で、「**リアルタイム取得部分だけ**」を差し替えるための**コピペ用プロンプト**を用意しました。**ボット作成の実装には一切手を入れない**前提です。
+
+（今回の改修は、参考記事の構成＝**Meeting BaaSの`streaming`で当方WSへ音声をプッシュ**→**当方WSからGladiaのLive WSへ中継**→**`type: "transcript"`イベント受信**に準拠します。記事内の`streaming.audio_frequency/input/output`指定と、Gladiaの`/v2/live`初期化・WS受信仕様が根拠です。([Zenn][1], [docs.gladia.io][2])）
+
+---
+
+# 🛠 コーディングエージェント用・修正依頼プロンプト（コピペ可）
+
+あなたは既存コードベースに精通したシニアTypeScriptエンジニアです。
+**目的**：既存の「MBaaS → 当方API（SSE中継） → クライアント」構成を、**MBaaSの`streaming`で当方のWebSocketに音声バイナリを直接プッシュ**させ、**当方がGladiaのLive WSへ中継してリアルタイム文字起こしを受け取る**方式に**最小差分で切り替え**ること。
+**重要**：**ボット作成周りは改修対象外**（既存のまま）。本PRは**リアルタイム取得〜中継のみ**を対象とする。
+
+## 1) 現状の前提（監査レポからの要点）
+
+* 当方は **SSE** でクライアントに`audio`/`transcript`イベントを中継。音声は**base64のOpus**（サンプルレート/bit深度は不明）を**パススルー**。再接続・バックプレッシャなし。
+  対応ファイルの主な位置：
+
+  * `src/clients/meetingbaas.adapter.v1.ts` … **MBaaSのストリーミング接続/処理の中核**
+  * `src/controllers/streams.controller.ts` … **SSE配信**
+  * `src/clients/http.client.ts` … リトライはHTTPのみ。ストリーム再接続なし
+  * `src/clients/meetingbaas.config.ts` … プロトコルやタイムアウト定義
+    （詳細は`docs/realtime-audit.md`参照）
+
+## 2) 変更のゴール（挙動レベル）
+
+* **当方でWebSocketサーバを立てる**（例：`/mb-input`）。**MBaaSの`streaming.input`にこのWS URLが設定され、MBaaS→当方へ**16kHz相当のバイナリ音声が**プッシュ**される想定。([Zenn][1])
+* 当方は **GladiaのLive API** を`POST /v2/live`で初期化→返却された`ws url`へ接続。**受け取ったバイナリ音声をそのままGladia WSへ送信**。受信する\*\*`type: "transcript"`\*\*イベント（`data.is_final`等）を構造化ログ＋（必要に応じて）既存SSEにも中継。([docs.gladia.io][2])
+* 既存の**ボット作成処理は変更しない**。`streaming`の設定（`audio_frequency: "16khz"`, `input`, `output`）は**呼び出し元で既に指定される**前提とし、本PRでは**受け側（当方WS）とGladiaへの中継**のみを実装する。参考：Zenn記事の`streaming`指定例。([Zenn][1])
+
+## 3) スコープ（やること / やらないこと）
+
+* ✅ やる
+
+  * **WSサーバの実装**（`/mb-input`）と**Gladia Live WS中継**、**ログ/再接続**、**SSEの互換維持（transcript）**
+  * **バックプレッシャ**（簡易送信キュー or `ws`の`bufferedAmount`監視でドロップ/間引き）
+  * **ヘルスエンドポイント**（既存`/healthz`で十分）
+* ❌ やらない
+
+  * **ボット作成のペイロード改修**（`streaming`付与など）
+  * **最終データのWebhook連携**の仕様変更（必要なら別PR）
+
+## 4) 実装タスク（ファイル別）
+
+1. **`src/index.ts`（またはサーバ初期化箇所）**
+
+   * 既存Honoサーバに`ws`をアタッチ。`server.on('upgrade', …)`で`/mb-input`だけ受け入れ。
+   * `WebSocketServer({ noServer: true })`でパス別にハンドリング。
+2. **`src/realtime/ws-relay.ts`（新規）**
+
+   * **Gladiaセッション初期化**：`POST https://api.gladia.io/v2/live`（Headers: `X-Gladia-Key`, `Content-Type: application/json`）で`{ encoding:"wav/pcm", sample_rate:16000, bit_depth:16, channels:1 }`を送信→`url`取得・接続。**イベント`type:"transcript"`と`data.is_final`で最終判定**。([docs.gladia.io][2])
+   * **MBaaS→当方WS（/mb-input）**：**バイナリ音声を受信**したら**そのまま`gladiaWs.send(buffer)`**。Zenn記事のリレー実装に沿う。([Zenn][1])
+   * **再接続**：Gladia WSは**指数バックオフ**（最初5秒〜上限60秒）。
+   * **バックプレッシャ**：`gladiaWs.bufferedAmount`が閾値超なら**最新フレームを優先**し古いフレームを間引く（メトリクス/警告ログを出す）。
+3. **`src/controllers/streams.controller.ts`**
+
+   * 既存の**SSE出力を維持**。ソースを「MBaaSのSSE」から「**Gladiaの受信イベント**」に切り替え。
+   * `transcript`イベントは**従来のスキーマを極力保持**（`isFinal`, `text`, `lang`）。
+   * `audio`イベントは**互換維持が不要なら削除**。残す場合は**base64 PCM16**として出すか、\*\*イベント型に`format:"pcm16"`\*\*を付ける（後方互換性に留意）。
+4. **`src/clients/meetingbaas.adapter.v1.ts`**
+
+   * **MBaaSのSSE購読（/bots/\:botId/transcription）ロジックを無効化/撤去**し、**新しいWSリレーに委譲**する。
+   * **設定値**（`MEETING_BAAS_STREAM_PROTOCOL`など）で古い経路（SSE）と新経路（WSリレー）を**トグル可能**にする。
+5. **`src/clients/http.client.ts`**
+
+   * ストリーム関連の**リトライ/再接続ユーティリティ**を追加（WS専用ヘルパでも可）。
+6. **`src/utils/logger.ts`**
+
+   * 既存の構造化フォーマットに合わせ、**主要イベント**を出力：
+
+     * `mb_input:connected/disconnected`, `gladia:open/close/error`, `relay:audio_chunk:size`, `transcript:{final|partial}` など。
+
+## 5) 設定・環境変数
+
+* 追加/利用
+
+  * `GLADIA_API_KEY`（必須）
+  * `PUBLIC_WS_BASE`（ngrok or Cloud RunのWSSベースURL）
+  * `STREAM_RECONNECT_BASE_MS`（デフォルト5000）
+  * `STREAM_BACKPRESSURE_MAX_BUFFER`（デフォルト1–5MB程度）
+* 既存の `MEETING_BAAS_*` は変更なし。`MEETING_BAAS_STREAM_PROTOCOL`がある場合は`"ws-relay"`を新設。
+
+## 6) 受け入れ条件（AC）
+
+* **ローカル**：`ngrok http 8080` を公開し、**ボット作成時に既に設定された** `streaming.input="wss://<ngrok>/mb-input"` で、**当方WSに接続される**（ログ：`mb_input:connected`）。([Zenn][1])
+* **Gladia**：`POST /v2/live`で`url`取得→WS接続成功。**`type:"transcript"`イベントを受信**し、`data.is_final`が`true`の文が**構造化ログ**に出る。([docs.gladia.io][2])
+* **SSE互換**：`GET /v1/meetings/:meetingId/stream` に対し、**transcriptイベントが継続配信**される（partial/final区別あり）。
+* **回復性**：Gladia WS切断時は自動再接続（指数バックオフ）。過負荷時は音声フレームを安全に間引ける。
+* **無停止切替**：`MEETING_BAAS_STREAM_PROTOCOL=sse|ws-relay`で旧実装に即時ロールバック可能。
+
+## 7) テスト観点
+
+* **エンドツーエンド**：ngrok公開→Meetで発話→コンソールに`Transcript: ... isFinal: true`が出るまで
+* **異常系**：Gladia WS切断・APIキー無効化・大量フレーム送信（バックプレッシャのログが出ること）
+* **互換**：既存クライアントがSSEの`transcript`で動き続けること
+
+## 8) 参考（仕様根拠）
+
+* Zenn記事：**MBaaSボット作成時の`streaming`パラメータ（`audio_frequency/input/output`）**、**当方WS⇄Gladia WS中継コード例**。([Zenn][1])
+* Gladia Live STT：**`POST /v2/live` の初期化**、**WSメッセージの`type:"transcript"`と`data.is_final`確認**。([docs.gladia.io][2])
+* MBaaSドキュメント：**ボット状態Webhook/データ取得の流れ**（最終データ・イベント種別の全体像把握用）。([Meeting BaaS][3])
+
+---
+
+このプロンプトを投げたあと、エージェントのPRが上がったら、`/v1/meetings/:meetingId/stream`の**互換確認**と、**Gladiaからの`transcript`がSSEに乗って流れるか**だけ見れば、切替の成否が一発で分かります。必要なら、そのPRを前提に**最小差分のレビュー用チェックリスト**もすぐ用意します。
+
+[1]: https://zenn.dev/sparkleai_blog/articles/78f89322573406 "オンライン会議にボットを参加させリアルタイムに文字起こし"
+[2]: https://docs.gladia.io/api-reference/v2/live/init?utm_source=chatgpt.com "Initiate a session"
+[3]: https://docs.meetingbaas.com/docs/api/getting-started/getting-the-data "Getting the Data | Meeting BaaS"

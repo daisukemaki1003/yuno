@@ -1,0 +1,45 @@
+/* github-markdown-cssのTailwind CSSリセット上書き */
+.markdown-body h2 {
+  margin-top: 60px;
+}
+
+.markdown-body h3 {
+  margin-top: 40px;
+}
+
+.markdown-body ul {
+  list-style-type: disc !important;
+  list-style-position: outside !important;
+  padding-left: 2em !important;
+}
+
+.markdown-body ol {
+  list-style-type: decimal !important;
+  list-style-position: outside !important;
+  padding-left: 2em !important;
+}
+
+.markdown-body ul ul {
+  list-style-type: circle !important;
+}
+
+.markdown-body ul ul ul {
+  list-style-type: square !important;
+}
+
+.markdown-body ol ol {
+  list-style-type: lower-alpha !important;
+}
+
+.markdown-body ol ol ol {
+  list-style-type: lower-roman !important;
+}
+
+.markdown-body li {
+  display: list-item !important;
+  margin: 0.25em 0 !important;
+}
+
+.markdown-body li > p {
+  margin: 0.5em 0 !important;
+}
