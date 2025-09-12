@@ -27,10 +27,10 @@ Meeting BaaS → WSリレー → Gladia Live APIのリアルタイム音声文�
 - ✅ 音声受信ログをdebugレベルに変更
 
 ### D) MeetingBaaS アダプタの整合性
-- ✅ `audio_frequency` を `sample_rate: 16000` に変更
-- ✅ streaming.outputフィールドを削除
+- ✅ Meeting BaaS用に `audio_frequency: "16khz"` を使用（Gladiaは `sample_rate: 16000`）
+- ✅ streaming.outputフィールドを同じURLに設定
 - ✅ Content-Type: application/json を常に付与
-- ✅ auth.scheme === "None"時は認証ヘッダを付与しない
+- ✅ `x-meeting-baas-api-key` ヘッダーで認証（Bearer形式ではない）
 - ✅ leaveBot時の不要なボディ送信を削除
 - ✅ ヘッダログのマスキング強化
 

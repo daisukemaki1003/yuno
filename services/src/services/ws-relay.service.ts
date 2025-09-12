@@ -85,7 +85,8 @@ async function initializeGladiaSession(logger: Logger): Promise<GladiaInitRespon
       "https://api.gladia.io/v2/live",
       {
         encoding: "wav/pcm",
-        sample_rate: 16000,
+        sample_rate: 16000,  // Gladia uses sample_rate (integer), not audio_frequency
+        bit_depth: 16,
         channels: 1
       },
       {

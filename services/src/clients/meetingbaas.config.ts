@@ -98,8 +98,8 @@ export function meetingBaasConfig(): MeetingBaasConfig {
     baseUrl: env.MEETING_BAAS_BASE_URL,
     apiVersion: 'v1',
     auth: {
-      header: 'Authorization',
-      scheme: 'Bearer',
+      header: 'x-meeting-baas-api-key',
+      scheme: 'None',  // No scheme, just the API key directly
     },
     timeouts: {
       requestMs: env.MEETING_BAAS_TIMEOUT_REQUEST_MS || 15000,

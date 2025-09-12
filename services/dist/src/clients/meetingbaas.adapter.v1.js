@@ -26,10 +26,28 @@ class MeetingBaasAdapterV1 {
         this.apiKey = apiKey;
         this.logger = new Logger("meeting-baas-adapter");
         this.http = new HttpClient(this.logger);
+        // Debug: Check if API key is provided
+        if (!apiKey || apiKey.trim() === '') {
+            this.logger.error("API key is empty or not provided");
+        }
     }
     async addBot(meetingUrl, botName) {
         const url = this.buildUrl(this.config.endpoints.addBot.path, {});
         const headers = this.buildHeaders();
+        // Debug: Log headers (mask sensitive data)
+        this.logger.info("Request headers", {
+            headers: Object.keys(headers).reduce((acc, key) => {
+                const lowerKey = key.toLowerCase();
+                if (lowerKey.includes('key') || lowerKey.includes('authorization')) {
+                    // Show API key length
+                    acc[key] = `[${headers[key].length} chars]`;
+                }
+                else {
+                    acc[key] = headers[key];
+                }
+                return acc;
+            }, {})
+        });
         const requestBody = {
             bot_name: botName || "Meeting Bot",
             meeting_url: meetingUrl,
@@ -43,9 +61,9 @@ class MeetingBaasAdapterV1 {
                 waiting_room_timeout: 600,
             },
             streaming: {
-                sample_rate: 16000,
+                audio_frequency: "16khz", // Meeting BaaS uses "16khz", not sample_rate
                 input: `${env.PUBLIC_WS_BASE}/mb-input`,
-                // output is not used, leave it empty
+                output: `${env.PUBLIC_WS_BASE}/mb-input` // Same as input for now
             },
         };
         try {
@@ -114,8 +132,8 @@ class MeetingBaasAdapterV1 {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         };
-        // Add auth header (Meeting BaaS always uses Bearer token)
-        headers[this.config.auth.header] = `Bearer ${this.apiKey}`;
+        // Add auth header (Meeting BaaS uses x-meeting-baas-api-key header)
+        headers[this.config.auth.header] = this.apiKey;
         return headers;
     }
     mapError(err) {

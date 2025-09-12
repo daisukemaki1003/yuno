@@ -34,7 +34,8 @@ async function initializeGladiaSession(logger) {
         const httpClient = new HttpClient(logger);
         const response = await httpClient.post("https://api.gladia.io/v2/live", {
             encoding: "wav/pcm",
-            sample_rate: 16000,
+            sample_rate: 16000, // Gladia uses sample_rate (integer), not audio_frequency
+            bit_depth: 16,
             channels: 1
         }, {
             headers: {

@@ -23,6 +23,7 @@ export class HttpClient {
     'api-key',
     'x-gladia-key',
     'x-auth-token',
+    'x-meeting-baas-api-key',
     'cookie',
     'set-cookie'
   ];

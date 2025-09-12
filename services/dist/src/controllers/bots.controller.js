@@ -19,6 +19,11 @@ setInterval(() => {
 export async function addBot(c) {
     const logger = c.get("logger");
     const apiKey = c.get("meetingBaasApiKey");
+    // Debug: Check API key
+    logger.info("API key check", {
+        hasApiKey: !!apiKey,
+        apiKeyLength: apiKey?.length || 0
+    });
     // Check idempotency key
     const idempotencyKey = c.req.header("Idempotency-Key");
     if (idempotencyKey) {
