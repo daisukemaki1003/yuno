@@ -1,11 +1,16 @@
 # WebSocket Relay Setup Guide
 
-このガイドでは、MBaaS → 当方WebSocket → Gladia Live APIのリアルタイム音声中継システムのセットアップ方法を説明します。
+このガイドでは、Meeting BaaS → 当サービス (WebSocket) → Gladia Live APIのリアルタイム音声中継システムのセットアップと検証方法を説明します。
+
+## システム概要
+
+当サービスは、Meeting BaaSからの音声ストリームをWebSocket経由で受信し、Gladia Live APIで文字起こしを行います。SSEモードは削除され、WebSocket relayが唯一の動作モードとなりました。
 
 ## 前提条件
 
 - Node.js 18以上
 - Gladia APIキー（[Gladia Console](https://console.gladia.io/)で取得）
+- Meeting BaaS APIキー
 - ngrok（ローカルテスト用）
 
 ## 環境変数の設定
@@ -13,16 +18,19 @@
 `.env`ファイルに以下の環境変数を設定してください：
 
 ```bash
-# ストリームプロトコルをws-relayモードに設定
-MEETING_BAAS_STREAM_PROTOCOL=ws-relay
+# 必須設定
+PROJECT_ID=your-project-id
+REGION=asia-northeast1
+KMS_KEY_NAME=projects/YOUR_PROJECT/locations/YOUR_REGION/keyRings/YOUR_KEYRING/cryptoKeys/YOUR_KEY
+MEETING_BAAS_BASE_URL=https://api.example.com
 
-# Gladia API設定
+# Gladia API設定（必須）
 GLADIA_API_KEY=your-gladia-api-key-here
-PUBLIC_WS_BASE=wss://your-domain.com  # 本番環境のWebSocket URL
+PUBLIC_WS_BASE=wss://your-domain.com  # MBaaSが接続するWebSocket URL
 
-# WebSocketリレー設定（オプション）
-STREAM_RECONNECT_BASE_MS=5000          # 再接続の基本待機時間（ms）
-STREAM_BACKPRESSURE_MAX_BUFFER=5242880 # バックプレッシャーの最大バッファサイズ（5MB）
+# WebSocketリレー設定（オプション - デフォルト値使用可）
+# STREAM_RECONNECT_BASE_MS=5000          # 再接続の基本待機時間（ms）
+# STREAM_BACKPRESSURE_MAX_BUFFER=5242880 # バックプレッシャーの最大バッファサイズ（5MB）
 ```
 
 ## ローカルでのテスト手順
@@ -72,18 +80,37 @@ curl http://localhost:8080/healthz
 }
 ```
 
+### 5. APIキーの設定
+
+テストを行う前に、Meeting BaaS APIキーを環境変数として設定するか、APIリクエストのヘッダーに含める必要があります。
+
 ## 動作確認
 
-### 1. ボット作成時の設定
+### 1. ボットの作成
 
-MBaaSでボットを作成する際、`streaming`パラメータに以下を指定：
+当サービス経由でボットを作成します：
+
+```bash
+curl -X POST http://localhost:8080/v1/bots \
+  -H "Authorization: Bearer YOUR_USER_TOKEN" \
+  -H "x-meeting-baas-api-key: YOUR_MBAAS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "meetingUrl": "https://meet.google.com/xxx-yyyy-zzz",
+    "botName": "Test Bot"
+  }'
+```
+
+このリクエストにより、当サービスがMeeting BaaSに以下の設定でボットを作成します：
 
 ```json
 {
+  "bot_name": "Test Bot",
+  "meeting_url": "https://meet.google.com/xxx-yyyy-zzz",
   "streaming": {
     "audio_frequency": "16khz",
     "input": "wss://abc123.ngrok.io/mb-input",
-    "output": null
+    "output": "wss://abc123.ngrok.io/mb-input"
   }
 }
 ```
@@ -102,12 +129,27 @@ WebSocket接続とGladia連携の状態をログで確認：
 - "Received transcript"           # 文字起こし結果受信
 ```
 
-### 3. SSEクライアントでの確認
+### 3. トランスクリプトストリームの受信
 
-既存のSSEクライアントでtranscriptイベントを受信できることを確認：
+SSE形式でトランスクリプトをリアルタイムに受信します：
 
 ```bash
-curl -N "http://localhost:8080/v1/meetings/YOUR_MEETING_ID/stream?userId=test&types=transcript"
+curl -N "http://localhost:8080/v1/meetings/YOUR_MEETING_ID/stream?userId=test&types=transcript" \
+  -H "Authorization: Bearer YOUR_USER_TOKEN" \
+  -H "x-meeting-baas-api-key: YOUR_MBAAS_API_KEY"
+```
+
+受信されるイベントの例：
+
+```
+event: ping
+data: {"timestamp":1704067200000}
+
+event: transcript
+data: {"type":"transcript","data":{"kind":"transcript","text":"こんにちは","lang":"ja","isFinal":false,"ts":1704067201000},"timestamp":1704067201000}
+
+event: transcript
+data: {"type":"transcript","data":{"kind":"transcript","text":"こんにちは、本日の会議を始めます","lang":"ja","isFinal":true,"ts":1704067202000},"timestamp":1704067202000}
 ```
 
 ## トラブルシューティング
@@ -126,7 +168,10 @@ Error: GLADIA_API_KEY is not configured
 WebSocket upgrade rejected
 ```
 
-→ URLパスが正確に`/mb-input`であることを確認してください。
+→ 以下を確認してください：
+- URLパスが正確に`/mb-input`であること
+- ngrokのURLが`PUBLIC_WS_BASE`環境変数に正しく設定されていること
+- Meeting BaaSからの接続がファイアウォールでブロックされていないこと
 
 ### Gladia接続タイムアウト
 
@@ -138,10 +183,26 @@ Gladia connection timeout
 
 ## 本番環境への展開
 
-1. Cloud Runまたは同等のサービスにデプロイ
-2. WebSocketサポートを有効化
-3. 環境変数を本番用に設定
-4. PUBLIC_WS_BASEを本番環境のWebSocket URLに更新
+### Cloud Runの場合
+
+1. WebSocketサポートを有効化：
+   ```bash
+   gcloud run deploy your-service \
+     --allow-unauthenticated \
+     --set-env-vars="GLADIA_API_KEY=your-key,PUBLIC_WS_BASE=wss://your-service.run.app" \
+     --cpu=1 \
+     --memory=512Mi \
+     --timeout=3600 \
+     --session-affinity
+   ```
+
+2. WebSocketのタイムアウト設定：
+   - Cloud Runのデフォルトタイムアウト（60分）に注意
+   - 長時間の会議には定期的な再接続が必要
+
+3. 環境変数の設定：
+   - Secret Managerを使用してAPIキーを安全に管理
+   - PUBLIC_WS_BASEを本番環境のURLに設定
 
 ## モニタリング
 
@@ -164,8 +225,26 @@ Gladia connection timeout
 - `relay:audio_chunk:size` - 音声データの中継
 - `transcript:{final|partial}` - 文字起こし結果
 
-## 既存システムとの互換性
+## システムアーキテクチャ
 
-- SSE配信は維持されるため、既存のクライアントは変更不要
-- `MEETING_BAAS_STREAM_PROTOCOL=sse`に設定することで即座に旧実装にロールバック可能
-- transcriptイベントの形式は既存と互換性を維持
+### データフロー
+
+```
+1. Meeting BaaS → WebSocket (/mb-input) → 当サービス
+   - 音声データをバイナリストリームで受信
+   
+2. 当サービス → Gladia Live API
+   - PCM形式（16kHz, 16bit, モノラル）で音声を転送
+   - 自動再接続、バックプレッシャー制御付き
+   
+3. Gladia → 当サービス → クライアント
+   - 文字起こし結果をSSE形式で配信
+   - /v1/meetings/:meetingId/stream エンドポイント
+```
+
+### 主な特徴
+
+- **自動再接続**: Gladia接続が切断された場合、指数バックオフで再接続
+- **バックプレッシャー制御**: 音声バッファが5MBを超えると古いフレームを自動削除
+- **複数言語対応**: Gladiaの言語自動検出機能を使用
+- **リアルタイム配信**: partial/finalの両方のトランスクリプトを即座に配信
