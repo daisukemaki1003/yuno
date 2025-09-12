@@ -54,10 +54,28 @@ PUBLIC_WS_BASE=wss://abc123.ngrok.io  # ngrokのURLに置き換え
 
 ### 3. サーバーを起動
 
+開発時は2つのオプションがあります：
+
+#### オプション1: モックサーバーを使用（推奨）
+
 ```bash
-# ターミナル2: 開発サーバーを起動
+# ターミナル2: モックサーバーと開発サーバーを同時起動
+pnpm dev:mock
+```
+
+この場合、`.env`ファイルのMEETING_BAAS_BASE_URLを以下に設定：
+```
+MEETING_BAAS_BASE_URL=http://localhost:4010
+```
+
+#### オプション2: 実際のMeeting BaaSを使用
+
+```bash
+# ターミナル2: 開発サーバーのみ起動
 pnpm dev
 ```
+
+この場合、`.env`ファイルのMEETING_BAAS_BASE_URLを実際のURLに設定してください。
 
 ### 4. ヘルスチェック
 
@@ -96,12 +114,15 @@ curl -X POST http://localhost:8080/v1/bots \
   -H "x-meeting-baas-api-key: YOUR_MBAAS_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
+    "userId": "test-user",
     "meetingUrl": "https://meet.google.com/xxx-yyyy-zzz",
     "botName": "Test Bot"
   }'
 ```
 
-注意: ヘッダー名は小文字の `x-meeting-baas-api-key` を使用してください。
+注意: 
+- ヘッダー名は小文字の `x-meeting-baas-api-key` を使用してください
+- リクエストボディには `userId` フィールドが必須です
 
 このリクエストにより、当サービスがMeeting BaaSに以下の設定でボットを作成します：
 

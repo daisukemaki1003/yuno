@@ -56,7 +56,17 @@ class MeetingBaasAdapterV1 {
             return { botId: parsed.botId };
         }
         catch (err) {
-            this.logger.error("Failed to add bot", { meetingUrl, botName, error: err });
+            this.logger.error("Failed to add bot", {
+                meetingUrl,
+                botName,
+                error: err,
+                requestBody,
+                url,
+                headers: Object.keys(headers).reduce((acc, key) => {
+                    acc[key] = key.toLowerCase().includes('key') ? '***' : headers[key];
+                    return acc;
+                }, {})
+            });
             throw this.mapError(err);
         }
     }
