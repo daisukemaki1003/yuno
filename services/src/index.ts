@@ -81,15 +81,34 @@ if (process.env.NODE_ENV !== "production") {
       server.on("upgrade", (request, socket, head) => {
         const logger = new Logger(randomUUID());
         
+        // Parse URL and check path
+        const url = new URL(request.url!, `http://localhost:${PORT}`);
+        
         // Only accept connections to /mb-input
-        if (request.url === "/mb-input") {
-          logger.info("WebSocket upgrade request", { path: request.url });
+        if (url.pathname === "/mb-input") {
+          // Check authentication if configured
+          if (env.WS_RELAY_AUTH_TOKEN) {
+            const authToken = url.searchParams.get('auth') || request.headers['x-auth-token'];
+            
+            if (authToken !== env.WS_RELAY_AUTH_TOKEN) {
+              logger.warn("WebSocket upgrade rejected - unauthorized", { 
+                path: url.pathname,
+                providedAuth: authToken ? '***' : 'none'
+              });
+              socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+              socket.destroy();
+              return;
+            }
+          }
+          
+          logger.info("WebSocket upgrade request", { path: url.pathname });
           
           wss.handleUpgrade(request, socket, head, (ws) => {
             wss.emit("connection", ws, request);
           });
         } else {
-          logger.warn("WebSocket upgrade rejected", { path: request.url });
+          logger.warn("WebSocket upgrade rejected - invalid path", { path: url.pathname });
+          socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
           socket.destroy();
         }
       });

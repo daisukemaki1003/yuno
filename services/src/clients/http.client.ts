@@ -17,9 +17,33 @@ export interface HttpOptions {
  */
 export class HttpClient {
   private logger: Logger;
+  private static readonly SENSITIVE_HEADERS = [
+    'authorization',
+    'x-api-key',
+    'api-key',
+    'x-gladia-key',
+    'x-auth-token',
+    'cookie',
+    'set-cookie'
+  ];
 
   constructor(logger: Logger) {
     this.logger = logger;
+  }
+
+  /**
+   * Mask sensitive headers for logging
+   */
+  private maskHeaders(headers: Record<string, string>): Record<string, string> {
+    const masked: Record<string, string> = {};
+    for (const [key, value] of Object.entries(headers)) {
+      if (HttpClient.SENSITIVE_HEADERS.includes(key.toLowerCase())) {
+        masked[key] = '***';
+      } else {
+        masked[key] = value;
+      }
+    }
+    return masked;
   }
 
   /**
@@ -38,7 +62,12 @@ export class HttpClient {
     
     for (let attempt = 0; attempt < retryCount; attempt++) {
       try {
-        this.logger.debug('HTTP request', { url, method, attempt });
+        this.logger.debug('HTTP request', { 
+          url, 
+          method, 
+          attempt,
+          headers: this.maskHeaders(headers)
+        });
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -63,6 +92,7 @@ export class HttpClient {
             url,
             status: response.status,
             body: responseText,
+            headers: this.maskHeaders(headers)
           });
 
           // Retry on 5xx errors
@@ -106,6 +136,7 @@ export class HttpClient {
               url,
               attempt,
               error: err.message,
+              headers: this.maskHeaders(headers)
             });
             await this.sleep(1000 * (attempt + 1));
             continue;

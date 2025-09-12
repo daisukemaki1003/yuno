@@ -4,16 +4,12 @@ import { env } from '@/configs/env.js';
  * This function builds the configuration from env vars
  */
 export function meetingBaasConfig() {
-    const authHeader = env.MEETING_BAAS_AUTH_HEADER || 'Authorization';
-    const authScheme = env.MEETING_BAAS_AUTH_SCHEME || 'None';
-    const apiVersion = env.MEETING_BAAS_API_VERSION || 'v1';
     return {
         baseUrl: env.MEETING_BAAS_BASE_URL,
-        apiVersion,
+        apiVersion: 'v1',
         auth: {
-            header: authHeader,
-            scheme: authScheme,
-            // queryParam: env.MEETING_BAAS_AUTH_QUERY_PARAM, // Uncomment if needed
+            header: 'Authorization',
+            scheme: 'Bearer',
         },
         timeouts: {
             requestMs: env.MEETING_BAAS_TIMEOUT_REQUEST_MS || 15000,

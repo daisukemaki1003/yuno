@@ -35,6 +35,7 @@ export async function recordingSse(c: Context): Promise<Response> {
   c.header('Content-Type', 'text/event-stream');
   c.header('Cache-Control', 'no-cache');
   c.header('Connection', 'keep-alive');
+  c.header('X-Accel-Buffering', 'no'); // Disable Nginx buffering
 
   return stream(c, async (stream) => {
     let pingInterval: NodeJS.Timeout | null = null;
@@ -54,24 +55,43 @@ export async function recordingSse(c: Context): Promise<Response> {
               text: data.text,
               lang: data.language,
               isFinal: data.isFinal,
-              ts: new Date(data.timestamp).getTime()
+              ts: new Date(data.timestamp).getTime(),
+              confidence: data.confidence
             },
             timestamp: new Date(data.timestamp).getTime(),
           };
           
-          stream.write(`event: transcript\ndata: ${JSON.stringify(event)}\n\n`);
+          // Ensure we don't exceed SSE line length limits
+          const eventData = JSON.stringify(event);
+          if (eventData.length > 32768) {
+            logger.warn('SSE event data too large, truncating', { 
+              originalLength: eventData.length,
+              meetingId 
+            });
+            const truncatedEvent = { ...event, data: { ...event.data, text: event.data.text.substring(0, 10000) + '...[truncated]' } };
+            stream.write(`event: transcript\ndata: ${JSON.stringify(truncatedEvent)}\n\n`);
+          } else {
+            stream.write(`event: transcript\ndata: ${eventData}\n\n`);
+          }
         }
       };
       
       // Subscribe to Gladia transcript events
       transcriptEmitter.on('transcript', gladiaListener);
 
-      // Set up ping interval (30 seconds)
+      // Send retry directive
+      await stream.write(`retry: 5000\n\n`);
+      
+      // Set up ping interval (20 seconds) with keep-alive comment
       pingInterval = setInterval(() => {
+        // Send keep-alive comment
+        stream.write(`: ping\n\n`);
+        // Also send ping event
         stream.write(`event: ping\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`);
-      }, 30000);
+      }, 20000);
 
       // Send initial ping
+      await stream.write(`: ping\n\n`);
       await stream.write(`event: ping\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`);
 
       // Keep the stream open

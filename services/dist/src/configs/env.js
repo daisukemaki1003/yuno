@@ -14,19 +14,18 @@ const envSchema = z.object({
     MEETING_BAAS_BASE_URL: z.string().url('MEETING_BAAS_BASE_URL must be a valid URL'),
     FIRESTORE_EMULATOR_HOST: z.string().optional(),
     // Meeting BaaS configuration
-    MEETING_BAAS_API_VERSION: z.string().optional(),
-    MEETING_BAAS_AUTH_HEADER: z.string().default('Authorization'),
-    MEETING_BAAS_AUTH_SCHEME: z.enum(['Bearer', 'ApiKey', 'Basic', 'None']).optional(),
     MEETING_BAAS_TIMEOUT_REQUEST_MS: z
         .string()
         .transform((val) => parseInt(val, 10))
         .refine((val) => !isNaN(val) && val > 0)
+        .default(15000)
         .optional()
         .or(z.number().optional()),
     MEETING_BAAS_TIMEOUT_STREAM_MS: z
         .string()
         .transform((val) => parseInt(val, 10))
         .refine((val) => !isNaN(val) && val > 0)
+        .default(600000)
         .optional()
         .or(z.number().optional()),
     // Gladia configuration (required for WebSocket relay)
@@ -49,6 +48,13 @@ const envSchema = z.object({
         .refine((val) => !isNaN(val) && val > 0)
         .default(5242880) // 5MB
         .optional(),
+    GLADIA_SEND_WS_CONFIG: z
+        .union([z.literal('true'), z.literal('false'), z.boolean()])
+        .transform((val) => val === 'true' || val === true)
+        .default(false)
+        .optional(),
+    // WebSocket relay security
+    WS_RELAY_AUTH_TOKEN: z.string().optional(),
 });
 /**
  * Parsed and validated environment variables

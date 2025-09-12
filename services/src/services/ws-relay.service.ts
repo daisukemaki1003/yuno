@@ -13,6 +13,14 @@ interface GladiaTranscriptEvent {
   type: string;
   data?: {
     is_final?: boolean;
+    utterance?: {
+      text?: string;
+      language?: string;
+      start?: number;
+      end?: number;
+      words?: any[];
+      confidence?: number;
+    };
     transcript?: string;
     language?: string;
     time_begin?: number;
@@ -30,12 +38,32 @@ interface RelaySession {
   reconnectTimer: NodeJS.Timeout | null;
   reconnectAttempts: number;
   audioQueue: Buffer[];
+  audioQueueBytes: number;
   isConnecting: boolean;
   meetingId?: string;
   lastActivity: Date;
+  generation: number;
+  keepAliveTimer?: NodeJS.Timeout;
 }
 
 const relaySessions = new Map<WebSocket, RelaySession>();
+const meetingIdToSession = new Map<string, RelaySession>();
+let globalGeneration = 0;
+
+/**
+ * Mask sensitive tokens in URLs
+ */
+function maskToken(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.searchParams.has('token')) {
+      u.searchParams.set('token', '***');
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
 
 // Event emitter for transcript events
 import { EventEmitter } from "events";
@@ -70,8 +98,7 @@ async function initializeGladiaSession(logger: Logger): Promise<GladiaInitRespon
 
     logger.info("Gladia session initialized", {
       sessionId: response.id,
-      url: response.url,
-      response: response
+      url: maskToken(response.url)
     });
 
     // URLが正しい形式かチェック
@@ -96,10 +123,17 @@ async function connectToGladia(session: RelaySession): Promise<WebSocket> {
   const gladiaSession = await initializeGladiaSession(logger);
   session.gladiaUrl = gladiaSession.url;
 
-  return new Promise((resolve, reject) => {
-    logger.info("Connecting to Gladia WebSocket", { url: session.gladiaUrl });
+  // Increment generation for this connection attempt
+  const myGeneration = ++globalGeneration;
+  session.generation = myGeneration;
 
-    const ws = new WebSocket(session.gladiaUrl!);
+  return new Promise((resolve, reject) => {
+    logger.info("Connecting to Gladia WebSocket", { url: maskToken(session.gladiaUrl!) });
+
+    const ws = new WebSocket(session.gladiaUrl!, {
+      perMessageDeflate: false,
+      handshakeTimeout: 10000
+    });
 
     const timeout = setTimeout(() => {
       ws.terminate();
@@ -110,6 +144,32 @@ async function connectToGladia(session: RelaySession): Promise<WebSocket> {
       clearTimeout(timeout);
       logger.info("Connected to Gladia WebSocket");
       session.reconnectAttempts = 0;
+
+      // Send config message if enabled
+      if (env.GLADIA_SEND_WS_CONFIG) {
+        const configMsg = {
+          type: "config",
+          encoding: "pcm_s16le",
+          sample_rate: 16000,
+          channels: 1
+        };
+        ws.send(JSON.stringify(configMsg));
+        logger.info("Sent config message to Gladia", { config: configMsg });
+      }
+
+      // Setup keep-alive ping
+      session.keepAliveTimer = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.ping();
+          logger.debug("Sent ping to Gladia");
+        }
+      }, 20000); // 20 seconds
+
+      ws.on("pong", () => {
+        session.lastActivity = new Date();
+        logger.debug("Received pong from Gladia");
+      });
+
       resolve(ws);
     });
 
@@ -117,23 +177,46 @@ async function connectToGladia(session: RelaySession): Promise<WebSocket> {
       clearTimeout(timeout);
       logger.error("Gladia WebSocket error", { 
         error: error.message || error,
-        url: session.gladiaUrl 
+        url: maskToken(session.gladiaUrl || '')
       });
       reject(error);
+    });
+
+    // Handle unexpected-response (403, etc.)
+    ws.on("unexpected-response", (request, response) => {
+      clearTimeout(timeout);
+      logger.error("Gladia WebSocket unexpected response", {
+        statusCode: response.statusCode,
+        statusMessage: response.statusMessage,
+        headers: response.headers,
+        url: maskToken(session.gladiaUrl || '')
+      });
+      ws.terminate();
+      reject(new Error(`WebSocket handshake failed: ${response.statusCode} ${response.statusMessage}`));
     });
 
     ws.on("close", (code, reason) => {
       logger.info("Gladia WebSocket closed", { 
         code, 
         reason: reason.toString(),
-        url: session.gladiaUrl
+        url: maskToken(session.gladiaUrl || '')
       });
-      session.gladiaWs = null;
-      scheduleReconnect(session);
+      
+      if (session.keepAliveTimer) {
+        clearInterval(session.keepAliveTimer);
+        session.keepAliveTimer = undefined;
+      }
+      
+      if (myGeneration === session.generation) {
+        session.gladiaWs = null;
+        scheduleReconnect(session);
+      }
     });
 
     ws.on("message", (data) => {
-      handleGladiaMessage(session, data);
+      if (myGeneration === session.generation) {
+        handleGladiaMessage(session, data);
+      }
     });
   });
 }
@@ -148,22 +231,40 @@ function handleGladiaMessage(session: RelaySession, data: WebSocket.Data) {
     const message = JSON.parse(data.toString()) as GladiaTranscriptEvent;
 
     if (message.type === "transcript" && message.data) {
-      const { is_final, transcript, language, confidence } = message.data;
+      // Handle both old and new Gladia response formats
+      let text: string | undefined;
+      let language: string | undefined;
+      let isFinal: boolean = false;
+      let confidence: number | undefined;
+
+      if (message.data.utterance) {
+        // New format with utterance object
+        text = message.data.utterance.text;
+        language = message.data.utterance.language;
+        confidence = message.data.utterance.confidence;
+        isFinal = message.data.is_final || false;
+      } else {
+        // Old format with direct fields
+        text = message.data.transcript;
+        language = message.data.language;
+        confidence = message.data.confidence;
+        isFinal = message.data.is_final || false;
+      }
 
       logger.info("Received transcript", {
-        isFinal: is_final,
-        text: transcript,
+        isFinal,
+        text,
         language,
         confidence,
-        length: transcript?.length,
+        length: text?.length,
       });
 
-      // Emit transcript event for SSE relay
+      // Emit transcript event for SSE relay with normalized schema
       transcriptEmitter.emit("transcript", {
         meetingId: session.meetingId,
         type: "transcript",
-        isFinal: is_final || false,
-        text: transcript || "",
+        isFinal,
+        text: text || "",
         language: language || "unknown",
         timestamp: new Date().toISOString(),
       });
@@ -206,6 +307,7 @@ function scheduleReconnect(session: RelaySession) {
       // Process queued audio
       while (session.audioQueue.length > 0) {
         const chunk = session.audioQueue.shift()!;
+        session.audioQueueBytes -= chunk.length;
         sendAudioToGladia(session, chunk);
       }
     } catch (error) {
@@ -225,18 +327,18 @@ function sendAudioToGladia(session: RelaySession, audioData: Buffer) {
   if (!gladiaWs || gladiaWs.readyState !== WebSocket.OPEN) {
     // Queue audio if not connected
     audioQueue.push(audioData);
+    session.audioQueueBytes += audioData.length;
 
     // Apply backpressure - drop old frames if queue is too large
     const maxBuffer = env.STREAM_BACKPRESSURE_MAX_BUFFER || 5242880; // 5MB
-    let totalSize = audioQueue.reduce((sum, buf) => sum + buf.length, 0);
 
-    while (totalSize > maxBuffer && audioQueue.length > 1) {
+    while (session.audioQueueBytes > maxBuffer && audioQueue.length > 1) {
       const dropped = audioQueue.shift()!;
-      totalSize -= dropped.length;
+      session.audioQueueBytes -= dropped.length;
       logger.warn("Dropped audio frame due to backpressure", {
         droppedSize: dropped.length,
         queueSize: audioQueue.length,
-        totalSize,
+        totalSize: session.audioQueueBytes,
       });
     }
 
@@ -265,6 +367,7 @@ function sendAudioToGladia(session: RelaySession, audioData: Buffer) {
   } catch (error) {
     logger.error("Failed to send audio to Gladia", { error });
     audioQueue.push(audioData);
+    session.audioQueueBytes += audioData.length;
   }
 }
 
@@ -272,6 +375,18 @@ function sendAudioToGladia(session: RelaySession, audioData: Buffer) {
  * Setup WebSocket relay for incoming MBaaS audio
  */
 export async function setupWebSocketRelay(ws: WebSocket, logger: Logger, meetingId?: string) {
+  // Check if meetingId already has an active session
+  if (meetingId && meetingIdToSession.has(meetingId)) {
+    const existingSession = meetingIdToSession.get(meetingId)!;
+    if (existingSession.mbWs.readyState === WebSocket.OPEN) {
+      logger.warn("Meeting already has an active session", { meetingId });
+      ws.close(1008, "Meeting already has an active session");
+      return;
+    } else {
+      // Clean up stale session
+      cleanupSession(existingSession);
+    }
+  }
   const session: RelaySession = {
     mbWs: ws,
     gladiaWs: null,
@@ -280,14 +395,21 @@ export async function setupWebSocketRelay(ws: WebSocket, logger: Logger, meeting
     reconnectTimer: null,
     reconnectAttempts: 0,
     audioQueue: [],
+    audioQueueBytes: 0,
     isConnecting: false,
     lastActivity: new Date(),
     meetingId: meetingId,
+    generation: 0,
   };
 
   logger.info("Setting up WebSocket relay", { meetingId });
 
   relaySessions.set(ws, session);
+  
+  // Track session by meetingId
+  if (meetingId) {
+    meetingIdToSession.set(meetingId, session);
+  }
 
   try {
     // Connect to Gladia
@@ -301,12 +423,22 @@ export async function setupWebSocketRelay(ws: WebSocket, logger: Logger, meeting
 
   // Handle incoming audio from MBaaS
   ws.on("message", (data) => {
+    // Normalize to Buffer
+    let audioBuffer: Buffer | null = null;
+    
     if (data instanceof Buffer) {
-      logger.info("Received audio from MBaaS", { 
-        size: data.length,
-        first10Bytes: data.slice(0, 10).toString('hex')
+      audioBuffer = data;
+    } else if (data instanceof ArrayBuffer) {
+      audioBuffer = Buffer.from(new Uint8Array(data));
+    } else if (ArrayBuffer.isView(data)) {
+      audioBuffer = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+    }
+    
+    if (audioBuffer) {
+      logger.debug("Received audio from MBaaS", { 
+        size: audioBuffer.length
       });
-      sendAudioToGladia(session, data);
+      sendAudioToGladia(session, audioBuffer);
     } else {
       // Handle non-binary messages (e.g., control messages)
       try {
@@ -354,11 +486,20 @@ function cleanupSession(session: RelaySession) {
     clearTimeout(reconnectTimer);
   }
 
+  if (session.keepAliveTimer) {
+    clearInterval(session.keepAliveTimer);
+  }
+
   if (gladiaWs && gladiaWs.readyState === WebSocket.OPEN) {
     gladiaWs.close();
   }
 
   relaySessions.delete(session.mbWs);
+  
+  // Remove from meetingId tracking
+  if (session.meetingId) {
+    meetingIdToSession.delete(session.meetingId);
+  }
 }
 
 /**
@@ -375,6 +516,7 @@ export function getRelayStats() {
       mbConnected: ws.readyState === WebSocket.OPEN,
       gladiaConnected: session.gladiaWs?.readyState === WebSocket.OPEN,
       queuedAudioFrames: session.audioQueue.length,
+      queuedAudioBytes: session.audioQueueBytes,
       reconnectAttempts: session.reconnectAttempts,
       lastActivity: session.lastActivity,
       meetingId: session.meetingId,

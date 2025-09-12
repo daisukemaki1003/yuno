@@ -4,8 +4,32 @@ import { internal } from '@/utils/errors.js';
  */
 export class HttpClient {
     logger;
+    static SENSITIVE_HEADERS = [
+        'authorization',
+        'x-api-key',
+        'api-key',
+        'x-gladia-key',
+        'x-auth-token',
+        'cookie',
+        'set-cookie'
+    ];
     constructor(logger) {
         this.logger = logger;
+    }
+    /**
+     * Mask sensitive headers for logging
+     */
+    maskHeaders(headers) {
+        const masked = {};
+        for (const [key, value] of Object.entries(headers)) {
+            if (HttpClient.SENSITIVE_HEADERS.includes(key.toLowerCase())) {
+                masked[key] = '***';
+            }
+            else {
+                masked[key] = value;
+            }
+        }
+        return masked;
     }
     /**
      * Fetch JSON from an endpoint
@@ -18,7 +42,12 @@ export class HttpClient {
         let lastError = null;
         for (let attempt = 0; attempt < retryCount; attempt++) {
             try {
-                this.logger.debug('HTTP request', { url, method, attempt });
+                this.logger.debug('HTTP request', {
+                    url,
+                    method,
+                    attempt,
+                    headers: this.maskHeaders(headers)
+                });
                 const controller = new AbortController();
                 const timeout = setTimeout(() => controller.abort(), timeoutMs);
                 const response = await fetch(url, {
@@ -38,6 +67,7 @@ export class HttpClient {
                         url,
                         status: response.status,
                         body: responseText,
+                        headers: this.maskHeaders(headers)
                     });
                     // Retry on 5xx errors
                     if (response.status >= 500 && attempt < retryCount - 1) {
@@ -76,6 +106,7 @@ export class HttpClient {
                             url,
                             attempt,
                             error: err.message,
+                            headers: this.maskHeaders(headers)
                         });
                         await this.sleep(1000 * (attempt + 1));
                         continue;

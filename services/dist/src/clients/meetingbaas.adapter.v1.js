@@ -36,14 +36,16 @@ class MeetingBaasAdapterV1 {
             reserved: false,
             recording_mode: "speaker_view",
             entry_message: "I am a good meeting bot :)",
+            speech_to_text: {
+                provider: "Default",
+            },
             automatic_leave: {
                 waiting_room_timeout: 600,
             },
             streaming: {
-                audio_frequency: "16khz",
+                sample_rate: 16000,
                 input: `${env.PUBLIC_WS_BASE}/mb-input`,
-                output: null,
-                // output: `${env.PUBLIC_WS_BASE}/mb-input`,
+                // output is not used, leave it empty
             },
         };
         try {
@@ -64,7 +66,13 @@ class MeetingBaasAdapterV1 {
                 requestBody,
                 url,
                 headers: Object.keys(headers).reduce((acc, key) => {
-                    acc[key] = key.toLowerCase().includes("key") ? "***" : headers[key];
+                    const lowerKey = key.toLowerCase();
+                    if (lowerKey.includes("key") || lowerKey.includes("authorization") || lowerKey === "x-api-key") {
+                        acc[key] = "***";
+                    }
+                    else {
+                        acc[key] = headers[key];
+                    }
                     return acc;
                 }, {}),
             });
@@ -78,7 +86,7 @@ class MeetingBaasAdapterV1 {
             await this.http.fetchJson(url, {
                 method: this.config.endpoints.leaveBot.method,
                 headers,
-                body: this.config.endpoints.leaveBot.method === "POST" ? { meetingId } : undefined,
+                // Don't send body for leaveBot
                 timeoutMs: this.config.timeouts.requestMs,
             });
         }
@@ -102,23 +110,12 @@ class MeetingBaasAdapterV1 {
         return url.toString();
     }
     buildHeaders() {
-        const headers = {};
-        // Add auth header if not using query param
-        if (!this.config.auth.queryParam) {
-            const scheme = this.config.auth.scheme;
-            if (scheme === "Bearer") {
-                headers[this.config.auth.header] = `Bearer ${this.apiKey}`;
-            }
-            else if (scheme === "ApiKey") {
-                headers[this.config.auth.header] = `ApiKey ${this.apiKey}`;
-            }
-            else if (scheme === "Basic") {
-                headers[this.config.auth.header] = `Basic ${this.apiKey}`;
-            }
-            else if (scheme === "None") {
-                headers[this.config.auth.header] = this.apiKey;
-            }
-        }
+        const headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        };
+        // Add auth header (Meeting BaaS always uses Bearer token)
+        headers[this.config.auth.header] = `Bearer ${this.apiKey}`;
         return headers;
     }
     mapError(err) {
