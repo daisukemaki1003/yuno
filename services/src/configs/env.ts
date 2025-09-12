@@ -32,11 +32,9 @@ const envSchema = z.object({
     .refine((val) => !isNaN(val) && val > 0)
     .optional()
     .or(z.number().optional()),
-  MEETING_BAAS_STREAM_PROTOCOL: z.enum(['ws', 'sse', 'ws-relay']).optional(),
-
-  // Gladia configuration
-  GLADIA_API_KEY: z.string().optional(),
-  PUBLIC_WS_BASE: z.string().optional(),
+  // Gladia configuration (required for WebSocket relay)
+  GLADIA_API_KEY: z.string().min(1, 'GLADIA_API_KEY is required'),
+  PUBLIC_WS_BASE: z.string().min(1, 'PUBLIC_WS_BASE is required'),
   
   // WebSocket relay configuration
   STREAM_RECONNECT_BASE_MS: z

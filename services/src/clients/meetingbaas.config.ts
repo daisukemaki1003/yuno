@@ -65,10 +65,6 @@ export type MeetingBaasConfig = {
      */
     leaveBot: { method: 'POST' | 'DELETE'; path: string };
     
-    /**
-     * Recording stream endpoint
-     */
-    stream: { protocol: 'ws' | 'sse'; path: string };
   };
 
   /**
@@ -98,10 +94,9 @@ export type MeetingBaasConfig = {
  * This function builds the configuration from env vars
  */
 export function meetingBaasConfig(): MeetingBaasConfig {
-  const authHeader = env.MEETING_BAAS_AUTH_HEADER || 'x-meeting-baas-api-key';
+  const authHeader = env.MEETING_BAAS_AUTH_HEADER || 'Authorization';
   const authScheme = (env.MEETING_BAAS_AUTH_SCHEME as MeetingBaasConfig['auth']['scheme']) || 'None';
   const apiVersion = env.MEETING_BAAS_API_VERSION || 'v1';
-  const streamProtocol = (env.MEETING_BAAS_STREAM_PROTOCOL as 'ws' | 'sse') || 'sse';
 
   return {
     baseUrl: env.MEETING_BAAS_BASE_URL,
@@ -123,10 +118,6 @@ export function meetingBaasConfig(): MeetingBaasConfig {
       leaveBot: {
         method: 'DELETE',
         path: `/bots/:botId`, // DELETE /bots/{id}
-      },
-      stream: {
-        protocol: streamProtocol,
-        path: `/bots/:botId/transcription`, // Actual Meeting BaaS streaming path
       },
     },
     maps: {

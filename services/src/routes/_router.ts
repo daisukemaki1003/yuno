@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { env } from '@/configs/env.js';
 
 /**
  * Main router for aggregating all routes
@@ -11,17 +10,15 @@ export const router = new Hono();
 router.get('/healthz', async (c) => {
   const health: any = {
     status: 'ok',
-    streamMode: env.MEETING_BAAS_STREAM_PROTOCOL,
+    streamMode: 'ws-relay',
   };
 
-  // Include WebSocket relay stats if in ws-relay mode
-  if (env.MEETING_BAAS_STREAM_PROTOCOL === 'ws-relay') {
-    try {
-      const { getRelayStats } = await import('@/services/ws-relay.service.js');
-      health.wsRelay = getRelayStats();
-    } catch (error) {
-      health.wsRelay = { error: 'Failed to get relay stats' };
-    }
+  // Include WebSocket relay stats
+  try {
+    const { getRelayStats } = await import('@/services/ws-relay.service.js');
+    health.wsRelay = getRelayStats();
+  } catch (error) {
+    health.wsRelay = { error: 'Failed to get relay stats' };
   }
 
   return c.json(health);
