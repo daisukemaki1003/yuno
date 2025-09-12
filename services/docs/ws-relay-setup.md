@@ -1,5 +1,9 @@
 # WebSocket Relay Production Patch - 安定稼働対応
 
+## テスト手順
+
+詳細なテスト手順については [testing-guide.md](./testing-guide.md) を参照してください。
+
 ## 概要
 
 Meeting BaaS → WSリレー → Gladia Live APIのリアルタイム音声文字起こしを安定稼働させるための修正パッチです。

@@ -97,13 +97,17 @@ if (process.env.NODE_ENV !== "production") {
                 await setupWebSocketRelay(ws, logger, meetingId || undefined);
             });
             const logger = new Logger(randomUUID());
-            logger.info("Dev server started with WebSocket support", {
-                port: Number(PORT),
-                wsPath: "/mb-input",
-                env: {
-                    PROJECT_ID: env.PROJECT_ID,
-                    REGION: env.REGION,
-                },
+            // Import transcript logger to show log file path
+            import("@/utils/transcript-logger.js").then(({ transcriptLogger }) => {
+                logger.info("Dev server started with WebSocket support", {
+                    port: Number(PORT),
+                    wsPath: "/mb-input",
+                    transcriptLogFile: transcriptLogger.getLogFilePath(),
+                    env: {
+                        PROJECT_ID: env.PROJECT_ID,
+                        REGION: env.REGION,
+                    },
+                });
             });
         });
     });

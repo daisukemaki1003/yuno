@@ -1,6 +1,7 @@
 import WebSocket from "ws";
 import { env } from "@/configs/env.js";
 import { HttpClient } from "@/clients/http.client.js";
+import { transcriptLogger } from "@/utils/transcript-logger.js";
 const relaySessions = new Map();
 const meetingIdToSession = new Map();
 let globalGeneration = 0;
@@ -98,12 +99,12 @@ async function connectToGladia(session) {
             session.keepAliveTimer = setInterval(() => {
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.ping();
-                    logger.debug("Sent ping to Gladia");
+                    // Silently send ping
                 }
             }, 20000); // 20 seconds
             ws.on("pong", () => {
                 session.lastActivity = new Date();
-                logger.debug("Received pong from Gladia");
+                // Silently update activity
             });
             resolve(ws);
         });
@@ -116,7 +117,7 @@ async function connectToGladia(session) {
             reject(error);
         });
         // Handle unexpected-response (403, etc.)
-        ws.on("unexpected-response", (request, response) => {
+        ws.on("unexpected-response", (_request, response) => {
             clearTimeout(timeout);
             logger.error("Gladia WebSocket unexpected response", {
                 statusCode: response.statusCode,
@@ -144,6 +145,7 @@ async function connectToGladia(session) {
         });
         ws.on("message", (data) => {
             if (myGeneration === session.generation) {
+                // Process message silently
                 handleGladiaMessage(session, data);
             }
         });
@@ -176,12 +178,22 @@ function handleGladiaMessage(session, data) {
                 confidence = message.data.confidence;
                 isFinal = message.data.is_final || false;
             }
-            logger.info("Received transcript", {
+            // Log only final transcripts to console
+            if (isFinal && text) {
+                logger.info("📝 Transcript", {
+                    text,
+                    language,
+                    confidence
+                });
+            }
+            // Log all transcripts to file
+            transcriptLogger.logTranscript({
+                meetingId: session.meetingId,
+                text: text || "",
+                language: language || "unknown",
                 isFinal,
-                text,
-                language,
                 confidence,
-                length: text?.length,
+                timestamp: new Date().toISOString()
             });
             // Emit transcript event for SSE relay with normalized schema
             transcriptEmitter.emit("transcript", {
@@ -195,6 +207,12 @@ function handleGladiaMessage(session, data) {
         }
         else if (message.type === "error") {
             logger.error("Gladia error event", { message });
+            // Log error to file
+            transcriptLogger.logError(message, { meetingId: session.meetingId });
+        }
+        else if (message.type !== "ready" && message.type !== "connected") {
+            // Only log unexpected event types
+            logger.debug("Gladia event", { type: message.type });
         }
     }
     catch (error) {
@@ -272,10 +290,7 @@ function sendAudioToGladia(session, audioData) {
     try {
         gladiaWs.send(audioData);
         session.lastActivity = new Date();
-        logger.debug("Sent audio to Gladia", {
-            size: audioData.length,
-            bufferedAmount: gladiaWs.bufferedAmount,
-        });
+        // Silently sent audio
     }
     catch (error) {
         logger.error("Failed to send audio to Gladia", { error });
@@ -344,9 +359,7 @@ export async function setupWebSocketRelay(ws, logger, meetingId) {
             audioBuffer = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
         }
         if (audioBuffer) {
-            logger.debug("Received audio from MBaaS", {
-                size: audioBuffer.length
-            });
+            // Silently process audio
             sendAudioToGladia(session, audioBuffer);
         }
         else {
