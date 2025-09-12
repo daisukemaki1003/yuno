@@ -100,7 +100,7 @@ if (process.env.NODE_ENV !== "production") {
         logger.info("WebSocket client connected", { path: request.url });
 
         // Import and initialize the WebSocket relay handler
-        const { setupWebSocketRelay } = await import("@/realtime/ws-relay.js");
+        const { setupWebSocketRelay } = await import("@/services/ws-relay.service.js");
         await setupWebSocketRelay(ws, logger);
       });
 

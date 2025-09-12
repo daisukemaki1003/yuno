@@ -17,7 +17,7 @@ router.get('/healthz', async (c) => {
   // Include WebSocket relay stats if in ws-relay mode
   if (env.MEETING_BAAS_STREAM_PROTOCOL === 'ws-relay') {
     try {
-      const { getRelayStats } = await import('@/realtime/ws-relay.js');
+      const { getRelayStats } = await import('@/services/ws-relay.service.js');
       health.wsRelay = getRelayStats();
     } catch (error) {
       health.wsRelay = { error: 'Failed to get relay stats' };

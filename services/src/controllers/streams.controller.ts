@@ -10,7 +10,7 @@ import { badRequest, internal } from '@/utils/errors.js';
 import type { Logger } from '@/utils/logger.js';
 import type { RecordingFrame } from '@/clients/meetingbaas.client.types.js';
 import { env } from '@/configs/env.js';
-import { transcriptEmitter } from '@/realtime/ws-relay.js';
+import { transcriptEmitter } from '@/services/ws-relay.service.js';
 
 /**
  * SSE recording stream handler
