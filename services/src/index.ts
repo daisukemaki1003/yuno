@@ -99,9 +99,13 @@ if (process.env.NODE_ENV !== "production") {
         const logger = new Logger(randomUUID());
         logger.info("WebSocket client connected", { path: request.url });
 
+        // Extract meetingId from query parameters if available
+        const url = new URL(request.url!, `http://localhost:${PORT}`);
+        const meetingId = url.searchParams.get('meetingId');
+
         // Import and initialize the WebSocket relay handler
         const { setupWebSocketRelay } = await import("@/services/ws-relay.service.js");
-        await setupWebSocketRelay(ws, logger);
+        await setupWebSocketRelay(ws, logger, meetingId || undefined);
       });
 
       const logger = new Logger(randomUUID());

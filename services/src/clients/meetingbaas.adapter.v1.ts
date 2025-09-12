@@ -44,6 +44,9 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       reserved: false,
       recording_mode: "speaker_view",
       entry_message: "I am a good meeting bot :)",
+      speech_to_text: {
+        provider: "Default",
+      },
       automatic_leave: {
         waiting_room_timeout: 600,
       },
@@ -51,7 +54,6 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
         audio_frequency: "16khz",
         input: `${env.PUBLIC_WS_BASE}/mb-input`,
         output: null,
-        // output: `${env.PUBLIC_WS_BASE}/mb-input`,
       },
     };
 

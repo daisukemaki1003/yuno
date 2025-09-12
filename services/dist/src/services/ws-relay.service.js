@@ -18,8 +18,7 @@ async function initializeGladiaSession(logger) {
         const response = await httpClient.post("https://api.gladia.io/v2/live", {
             encoding: "wav/pcm",
             sample_rate: 16000,
-            bit_depth: 16,
-            channels: 1,
+            channels: 1
         }, {
             headers: {
                 "X-Gladia-Key": env.GLADIA_API_KEY,
@@ -29,7 +28,12 @@ async function initializeGladiaSession(logger) {
         logger.info("Gladia session initialized", {
             sessionId: response.id,
             url: response.url,
+            response: response
         });
+        // URLが正しい形式かチェック
+        if (!response.url || !response.url.startsWith('wss://')) {
+            throw new Error(`Invalid Gladia WebSocket URL: ${response.url}`);
+        }
         return response;
     }
     catch (error) {
@@ -62,11 +66,18 @@ async function connectToGladia(session) {
         });
         ws.on("error", (error) => {
             clearTimeout(timeout);
-            logger.error("Gladia WebSocket error", { error });
+            logger.error("Gladia WebSocket error", {
+                error: error.message || error,
+                url: session.gladiaUrl
+            });
             reject(error);
         });
         ws.on("close", (code, reason) => {
-            logger.info("Gladia WebSocket closed", { code, reason: reason.toString() });
+            logger.info("Gladia WebSocket closed", {
+                code,
+                reason: reason.toString(),
+                url: session.gladiaUrl
+            });
             session.gladiaWs = null;
             scheduleReconnect(session);
         });
@@ -218,7 +229,10 @@ export async function setupWebSocketRelay(ws, logger) {
     // Handle incoming audio from MBaaS
     ws.on("message", (data) => {
         if (data instanceof Buffer) {
-            logger.debug("Received audio from MBaaS", { size: data.length });
+            logger.info("Received audio from MBaaS", {
+                size: data.length,
+                first10Bytes: data.slice(0, 10).toString('hex')
+            });
             sendAudioToGladia(session, data);
         }
         else {
