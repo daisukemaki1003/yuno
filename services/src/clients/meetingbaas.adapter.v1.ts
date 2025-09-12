@@ -58,7 +58,7 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       streaming: {
         audio_frequency: "16khz",
         input: `${process.env.PUBLIC_WS_BASE}/mb-input`,
-        output: null,
+        output: `${process.env.PUBLIC_WS_BASE}/mb-input`,
       },
     };
 
