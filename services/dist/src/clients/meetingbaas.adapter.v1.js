@@ -1,7 +1,7 @@
 import { HttpClient } from "./http.client.js";
 import { Logger } from "@/utils/logger.js";
 import { badRequest, internal } from "@/utils/errors.js";
-import { VendorAddBotResponseSchema, } from "@/schemas/vendor/meetingbaas.v1.js";
+import { VendorAddBotResponseSchema } from "@/schemas/vendor/meetingbaas.v1.js";
 import { env } from "@/configs/env.js";
 /**
  * Create Meeting BaaS adapter with given configuration
@@ -42,7 +42,8 @@ class MeetingBaasAdapterV1 {
             streaming: {
                 audio_frequency: "16khz",
                 input: `${env.PUBLIC_WS_BASE}/mb-input`,
-                output: `${env.PUBLIC_WS_BASE}/mb-input`,
+                output: null,
+                // output: `${env.PUBLIC_WS_BASE}/mb-input`,
             },
         };
         try {
@@ -63,9 +64,9 @@ class MeetingBaasAdapterV1 {
                 requestBody,
                 url,
                 headers: Object.keys(headers).reduce((acc, key) => {
-                    acc[key] = key.toLowerCase().includes('key') ? '***' : headers[key];
+                    acc[key] = key.toLowerCase().includes("key") ? "***" : headers[key];
                     return acc;
-                }, {})
+                }, {}),
             });
             throw this.mapError(err);
         }

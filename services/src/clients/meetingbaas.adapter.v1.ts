@@ -4,9 +4,7 @@ import type { MeetingBaasConfig } from "./meetingbaas.config.js";
 import { HttpClient } from "./http.client.js";
 import { Logger } from "@/utils/logger.js";
 import { badRequest, internal } from "@/utils/errors.js";
-import {
-  VendorAddBotResponseSchema,
-} from "@/schemas/vendor/meetingbaas.v1.js";
+import { VendorAddBotResponseSchema } from "@/schemas/vendor/meetingbaas.v1.js";
 import { env } from "@/configs/env.js";
 
 /**
@@ -52,7 +50,8 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       streaming: {
         audio_frequency: "16khz",
         input: `${env.PUBLIC_WS_BASE}/mb-input`,
-        output: `${env.PUBLIC_WS_BASE}/mb-input`,
+        output: null,
+        // output: `${env.PUBLIC_WS_BASE}/mb-input`,
       },
     };
 
@@ -67,16 +66,16 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       const parsed = VendorAddBotResponseSchema.parse(response);
       return { botId: parsed.botId };
     } catch (err) {
-      this.logger.error("Failed to add bot", { 
-        meetingUrl, 
-        botName, 
+      this.logger.error("Failed to add bot", {
+        meetingUrl,
+        botName,
         error: err,
         requestBody,
         url,
         headers: Object.keys(headers).reduce((acc, key) => {
-          acc[key] = key.toLowerCase().includes('key') ? '***' : headers[key];
+          acc[key] = key.toLowerCase().includes("key") ? "***" : headers[key];
           return acc;
-        }, {} as Record<string, string>)
+        }, {} as Record<string, string>),
       });
       throw this.mapError(err);
     }
@@ -98,7 +97,6 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       throw this.mapError(err);
     }
   }
-
 
   private buildUrl(pathTemplate: string, params: Record<string, string>): string {
     let path = pathTemplate;
@@ -152,5 +150,4 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
     }
     return internal("UNKNOWN_ERROR", "An unknown error occurred");
   }
-
 }
