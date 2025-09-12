@@ -1,7 +1,6 @@
 import { createMeetingBaasAdapter } from '@/clients/meetingbaas.adapter.v1.js';
 import type { MeetingBaasConfig } from '@/clients/meetingbaas.config.js';
 import type { MeetingBaasPort } from '@/clients/meetingbaas.client.port.js';
-import type { RecordingFrame } from '@/clients/meetingbaas.client.types.js';
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -25,7 +24,6 @@ describe('MeetingBaasAdapterV1', () => {
     endpoints: {
       addBot: { method: 'POST', path: '/v1/bots' },
       leaveBot: { method: 'POST', path: '/v1/bots/:botId/leave' },
-      stream: { protocol: 'sse', path: '/v1/meetings/:meetingId/recording' },
     },
     maps: {
       status: {
@@ -186,39 +184,7 @@ describe('MeetingBaasAdapterV1', () => {
     });
   });
 
-  describe('openRecordingStream', () => {
-    test('should handle normalized=false mode (passthrough)', async () => {
-      // Mock SSE response
-      const mockStream = new ReadableStream({
-        start(controller) {
-          controller.enqueue(new TextEncoder().encode('data: {"type":"custom","data":"test"}\n\n'));
-          controller.close();
-        },
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        body: mockStream,
-      } as Response);
-
-      const stream = await adapter.openRecordingStream('meeting-456', { normalized: false });
-      
-      const frames: RecordingFrame[] = [];
-      stream.onData((frame: RecordingFrame) => frames.push(frame));
-
-      // Wait for stream processing
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(frames.length).toBe(1);
-      expect(frames[0]).toEqual({
-        kind: 'event',
-        ts: expect.any(Number),
-        name: 'custom',
-        payload: expect.objectContaining({ type: 'custom', data: 'test' }),
-        vendorRaw: expect.objectContaining({ type: 'custom', data: 'test' }),
-      });
-    });
-
+  describe('configuration', () => {
     test('should support different status mappings', async () => {
       const customConfig: MeetingBaasConfig = {
         ...testConfig,

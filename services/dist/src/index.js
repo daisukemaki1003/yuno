@@ -46,17 +46,46 @@ app.onError(errorHandler);
 if (process.env.NODE_ENV !== "production") {
     const PORT = process.env.PORT || 3000;
     import("@hono/node-server").then(({ serve }) => {
-        serve({
-            fetch: app.fetch,
-            port: Number(PORT),
-        });
-        const logger = new Logger(randomUUID());
-        logger.info("Dev server started", {
-            port: Number(PORT),
-            env: {
-                PROJECT_ID: env.PROJECT_ID,
-                REGION: env.REGION,
-            },
+        import("ws").then(({ WebSocketServer }) => {
+            // Create HTTP server with Hono
+            const server = serve({
+                fetch: app.fetch,
+                port: Number(PORT),
+            });
+            // Create WebSocket server without built-in HTTP server
+            const wss = new WebSocketServer({ noServer: true });
+            // Handle upgrade requests
+            server.on("upgrade", (request, socket, head) => {
+                const logger = new Logger(randomUUID());
+                // Only accept connections to /mb-input
+                if (request.url === "/mb-input") {
+                    logger.info("WebSocket upgrade request", { path: request.url });
+                    wss.handleUpgrade(request, socket, head, (ws) => {
+                        wss.emit("connection", ws, request);
+                    });
+                }
+                else {
+                    logger.warn("WebSocket upgrade rejected", { path: request.url });
+                    socket.destroy();
+                }
+            });
+            // Handle WebSocket connections
+            wss.on("connection", async (ws, request) => {
+                const logger = new Logger(randomUUID());
+                logger.info("WebSocket client connected", { path: request.url });
+                // Import and initialize the WebSocket relay handler
+                const { setupWebSocketRelay } = await import("@/services/ws-relay.service.js");
+                await setupWebSocketRelay(ws, logger);
+            });
+            const logger = new Logger(randomUUID());
+            logger.info("Dev server started with WebSocket support", {
+                port: Number(PORT),
+                wsPath: "/mb-input",
+                env: {
+                    PROJECT_ID: env.PROJECT_ID,
+                    REGION: env.REGION,
+                },
+            });
         });
     });
 }

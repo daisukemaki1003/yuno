@@ -4,10 +4,9 @@ import { env } from '@/configs/env.js';
  * This function builds the configuration from env vars
  */
 export function meetingBaasConfig() {
-    const authHeader = env.MEETING_BAAS_AUTH_HEADER || 'x-meeting-baas-api-key';
+    const authHeader = env.MEETING_BAAS_AUTH_HEADER || 'Authorization';
     const authScheme = env.MEETING_BAAS_AUTH_SCHEME || 'None';
     const apiVersion = env.MEETING_BAAS_API_VERSION || 'v1';
-    const streamProtocol = env.MEETING_BAAS_STREAM_PROTOCOL || 'sse';
     return {
         baseUrl: env.MEETING_BAAS_BASE_URL,
         apiVersion,
@@ -28,10 +27,6 @@ export function meetingBaasConfig() {
             leaveBot: {
                 method: 'DELETE',
                 path: `/bots/:botId`, // DELETE /bots/{id}
-            },
-            stream: {
-                protocol: streamProtocol,
-                path: `/bots/:botId/transcription`, // Actual Meeting BaaS streaming path
             },
         },
         maps: {

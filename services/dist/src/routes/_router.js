@@ -5,8 +5,20 @@ import { Hono } from 'hono';
  */
 export const router = new Hono();
 // Health check endpoint
-router.get('/healthz', (c) => {
-    return c.json({ status: 'ok' });
+router.get('/healthz', async (c) => {
+    const health = {
+        status: 'ok',
+        streamMode: 'ws-relay',
+    };
+    // Include WebSocket relay stats
+    try {
+        const { getRelayStats } = await import('@/services/ws-relay.service.js');
+        health.wsRelay = getRelayStats();
+    }
+    catch (error) {
+        health.wsRelay = { error: 'Failed to get relay stats' };
+    }
+    return c.json(health);
 });
 // Add more route modules here as they are created
 // Example:

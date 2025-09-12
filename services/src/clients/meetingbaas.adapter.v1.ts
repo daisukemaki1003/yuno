@@ -7,6 +7,7 @@ import { badRequest, internal } from "@/utils/errors.js";
 import {
   VendorAddBotResponseSchema,
 } from "@/schemas/vendor/meetingbaas.v1.js";
+import { env } from "@/configs/env.js";
 
 /**
  * Create Meeting BaaS adapter with given configuration
@@ -50,8 +51,8 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       },
       streaming: {
         audio_frequency: "16khz",
-        input: `${process.env.PUBLIC_WS_BASE}/mb-input`,
-        output: `${process.env.PUBLIC_WS_BASE}/mb-input`,
+        input: `${env.PUBLIC_WS_BASE}/mb-input`,
+        output: `${env.PUBLIC_WS_BASE}/mb-input`,
       },
     };
 

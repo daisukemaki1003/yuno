@@ -21,9 +21,10 @@ export async function bearerAuth(c, next) {
  * This is temporary - will be replaced with Key Store integration
  */
 export async function extractMeetingBaasApiKey(c, next) {
-    const apiKey = c.req.header('X-MeetingBaas-ApiKey');
+    // Try both header name variations (case-insensitive)
+    const apiKey = c.req.header('x-meeting-baas-api-key') || c.req.header('X-MeetingBaas-ApiKey');
     if (!apiKey) {
-        throw unauthorized('MISSING_API_KEY', 'X-MeetingBaas-ApiKey header is required');
+        throw unauthorized('MISSING_API_KEY', 'x-meeting-baas-api-key header is required');
     }
     // Store in context for later use
     c.set('meetingBaasApiKey', apiKey);

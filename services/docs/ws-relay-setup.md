@@ -101,6 +101,8 @@ curl -X POST http://localhost:8080/v1/bots \
   }'
 ```
 
+注意: ヘッダー名は小文字の `x-meeting-baas-api-key` を使用してください。
+
 このリクエストにより、当サービスがMeeting BaaSに以下の設定でボットを作成します：
 
 ```json
