@@ -1,10 +1,9 @@
-import type { Config } from 'jest';
-import { pathsToModuleNameMapper } from 'ts-jest';
-// @ts-ignore
-import tsconfig from './tsconfig.json' assert { type: 'json' };
+const { pathsToModuleNameMapper } = require('ts-jest');
+const tsconfig = require('./tsconfig.json');
 const { compilerOptions } = tsconfig;
 
-const config: Config = {
+/** @type {import('jest').Config} */
+const config = {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   extensionsToTreatAsEsm: ['.ts'],
@@ -15,11 +14,14 @@ const config: Config = {
         ...compilerOptions,
         module: 'esnext',
         moduleResolution: 'node',
+        esModuleInterop: true,
+        isolatedModules: true
       }
     }]
   },
   moduleNameMapper: {
-    ...pathsToModuleNameMapper(compilerOptions.paths, { prefix: '<rootDir>/src/' }),
+    '^@/(.*)\\.js$': '<rootDir>/src/$1',
+    '^@/(.*)$': '<rootDir>/src/$1',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   testMatch: [
@@ -44,13 +46,9 @@ const config: Config = {
       lines: 80,
     },
   },
-  globals: {
-    'ts-jest': {
-      isolatedModules: true,
-    },
-  },
+  // globals config for ts-jest is deprecated, moved to transform config above
   testTimeout: 30000,
   maxWorkers: 1,
 };
 
-export default config;
+module.exports = config;

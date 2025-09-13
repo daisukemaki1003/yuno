@@ -1,4 +1,4 @@
-// Jest is available globally
+import { jest, beforeAll, afterAll } from '@jest/globals';
 import { join } from 'path';
 import { mkdirSync, rmSync } from 'fs';
 
@@ -31,14 +31,14 @@ beforeAll(() => {
   const originalError = console.error;
   const originalWarn = console.warn;
   
-  global.console.error = jest.fn((...args) => {
+  global.console.error = jest.fn((...args: any[]) => {
     // Only log actual errors, not expected ones
     if (!args[0]?.toString().includes('Expected')) {
       originalError(...args);
     }
   });
   
-  global.console.warn = jest.fn((...args) => {
+  global.console.warn = jest.fn((...args: any[]) => {
     // Only log actual warnings
     originalWarn(...args);
   });
@@ -63,7 +63,7 @@ global.fetch = jest.fn(() =>
     text: () => Promise.resolve('{}'),
     headers: new Headers(),
   } as Response)
-);
+) as jest.Mock;
 
 // Mock WebSocket
 class MockWebSocket {

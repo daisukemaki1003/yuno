@@ -1,3 +1,4 @@
+import { describe, beforeEach, afterEach, beforeAll, afterAll, it, expect, jest } from '@jest/globals';
 // Jest globals are available without import
 import { app } from '../../src/index.js';
 import { waitFor } from '../setup.js';

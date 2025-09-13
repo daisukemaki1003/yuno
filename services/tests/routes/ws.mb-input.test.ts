@@ -1,3 +1,4 @@
+import { describe, beforeEach, afterEach, beforeAll, afterAll, it, expect, jest } from '@jest/globals';
 // Jest globals are available without import
 import WebSocket from 'ws';
 import { app } from '../../src/index.js';
@@ -17,19 +18,24 @@ jest.unstable_mockModule('../../src/services/ws-relay.service.js', () => ({
 describe('WS /mb-input', () => {
   let server: Server;
   let wss: WebSocket.Server;
-  const PORT = 4001;
-  const WS_URL = `ws://localhost:${PORT}/mb-input`;
+  let PORT: number;
+  let WS_URL: string;
 
   beforeEach(async () => {
     // Reset mocks
     mockSetupWebSocketRelay.mockReset();
     mockGetRelayStats.mockReturnValue({ activeSessions: 0, sessions: [] });
 
-    // Start HTTP server with WebSocket support
+    // Start HTTP server with WebSocket support on random port
     server = serve({
       fetch: app.fetch,
-      port: PORT,
+      port: 0, // Use random available port
     });
+    
+    // Get the actual port after server starts
+    const address = server.address();
+    PORT = typeof address === 'object' && address !== null ? address.port : 0;
+    WS_URL = `ws://localhost:${PORT}/mb-input`;
 
     // Create WebSocket server
     wss = new WebSocket.Server({ noServer: true });

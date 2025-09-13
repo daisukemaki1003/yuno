@@ -1,3 +1,4 @@
+import { describe, beforeEach, afterEach, beforeAll, afterAll, it, expect, jest } from '@jest/globals';
 // Jest globals are available without import
 import { createMeetingBaasAdapter } from '../../src/clients/meetingbaas.adapter.v1.js';
 import type { MeetingBaasConfig } from '../../src/clients/meetingbaas.config.js';
