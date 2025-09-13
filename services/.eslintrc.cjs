@@ -26,9 +26,8 @@ module.exports = {
   ignorePatterns: [
     "dist/",
     "node_modules/",
-    "*.js",
     "*.cjs",
-    ".eslintrc.js",
+    ".eslintrc.cjs",
     "jest.config.ts",
     "tests/setup.ts"
   ]

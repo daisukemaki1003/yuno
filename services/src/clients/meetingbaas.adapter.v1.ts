@@ -32,13 +32,11 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
     this.apiKey = apiKey;
     this.logger = new Logger("meeting-baas-adapter");
     this.http = new HttpClient(this.logger);
-    
   }
 
   async addBot(meetingUrl: string, botName?: string): Promise<{ botId: BotId }> {
     const url = this.buildUrl(this.config.endpoints.addBot.path, {});
     const headers = this.buildHeaders();
-    
 
     const requestBody = {
       bot_name: botName || "Meeting Bot",
@@ -53,9 +51,9 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
         waiting_room_timeout: 600,
       },
       streaming: {
-        audio_frequency: "16khz",  // Meeting BaaS uses "16khz", not sample_rate
+        audio_frequency: "16khz", // Meeting BaaS uses "16khz", not sample_rate
         input: `${env.PUBLIC_WS_BASE}/mb-input`,
-        output: `${env.PUBLIC_WS_BASE}/mb-input`  // Same as input for now
+        output: `${env.PUBLIC_WS_BASE}/mb-input`, // Same as input for now
       },
     };
 
@@ -78,7 +76,11 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
         url,
         headers: Object.keys(headers).reduce((acc, key) => {
           const lowerKey = key.toLowerCase();
-          if (lowerKey.includes("key") || lowerKey.includes("authorization") || lowerKey === "x-api-key") {
+          if (
+            lowerKey.includes("key") ||
+            lowerKey.includes("authorization") ||
+            lowerKey === "x-api-key"
+          ) {
             acc[key] = "***";
           } else {
             acc[key] = headers[key];
@@ -128,8 +130,8 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
 
   private buildHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
+      "Content-Type": "application/json",
+      Accept: "application/json",
     };
 
     // Add auth header (Meeting BaaS uses x-meeting-baas-api-key header)
