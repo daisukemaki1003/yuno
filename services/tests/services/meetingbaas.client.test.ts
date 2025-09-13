@@ -1,8 +1,8 @@
 // Jest globals are available without import
-import { createMeetingBaasAdapter } from '@/clients/meetingbaas.adapter.v1.js';
-import type { MeetingBaasConfig } from '@/clients/meetingbaas.config.js';
-import type { MeetingBaasPort } from '@/clients/meetingbaas.client.port.js';
-import { HttpError } from '@/utils/errors.js';
+import { createMeetingBaasAdapter } from '../../src/clients/meetingbaas.adapter.v1.js';
+import type { MeetingBaasConfig } from '../../src/clients/meetingbaas.config.js';
+import type { MeetingBaasPort } from '../../src/clients/meetingbaas.client.port.js';
+import { HttpError } from '../../src/utils/errors.js';
 
 describe('Meeting BaaS Client/Adapter', () => {
   let adapter: MeetingBaasPort;

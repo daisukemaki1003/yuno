@@ -1,6 +1,6 @@
 // Jest globals are available without import
 import WebSocket from 'ws';
-import { app } from '@/index.js';
+import { app } from '../../src/index.js';
 import { serve } from '@hono/node-server';
 import { waitFor } from '../setup.js';
 import type { Server } from 'http';
@@ -9,7 +9,7 @@ import type { Server } from 'http';
 const mockSetupWebSocketRelay = jest.fn();
 const mockGetRelayStats = jest.fn(() => ({ activeSessions: 0, sessions: [] }));
 
-jest.unstable_mockModule('@/services/ws-relay.service.js', () => ({
+jest.unstable_mockModule('../../src/services/ws-relay.service.js', () => ({
   setupWebSocketRelay: mockSetupWebSocketRelay,
   getRelayStats: mockGetRelayStats
 }));
@@ -61,7 +61,7 @@ describe('WS /mb-input', () => {
     wss.on('connection', async (ws, request) => {
       const url = new URL(request.url!, `http://localhost:${PORT}`);
       const meetingId = url.searchParams.get('meetingId');
-      const { setupWebSocketRelay } = await import('@/services/ws-relay.service.js');
+      const { setupWebSocketRelay } = await import('../../src/services/ws-relay.service.js');
       await setupWebSocketRelay(ws, { info: jest.fn(), error: jest.fn(), warn: jest.fn() } as any, meetingId || undefined);
     });
 

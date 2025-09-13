@@ -1,9 +1,9 @@
 // Jest globals are available without import
-import { app } from '@/index.js';
+import { app } from '../../src/index.js';
 import { waitFor } from '../setup.js';
 
 // Mock the ws-relay.service module
-jest.unstable_mockModule('@/services/ws-relay.service.js', () => ({
+jest.unstable_mockModule('../../src/services/ws-relay.service.js', () => ({
   getRelayStats: jest.fn(() => ({
     activeSessions: 0,
     sessions: []
@@ -15,7 +15,7 @@ describe('GET /healthz', () => {
   let getRelayStats: jest.MockedFunction<any>;
 
   beforeEach(async () => {
-    const wsRelayModule = await import('@/services/ws-relay.service.js');
+    const wsRelayModule = await import('../../src/services/ws-relay.service.js');
     getRelayStats = wsRelayModule.getRelayStats as jest.MockedFunction<any>;
   });
 

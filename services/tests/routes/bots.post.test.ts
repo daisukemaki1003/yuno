@@ -1,7 +1,7 @@
 // Jest globals are available without import
-import { app } from '@/index.js';
-import type { MeetingBaasPort } from '@/clients/meetingbaas.client.port.js';
-import { HttpError } from '@/utils/errors.js';
+import { app } from '../../src/index.js';
+import type { MeetingBaasPort } from '../../src/clients/meetingbaas.client.port.js';
+import { HttpError } from '../../src/utils/errors.js';
 
 // Mock the Meeting BaaS service
 const mockBaasClient: jest.Mocked<MeetingBaasPort> = {
@@ -9,11 +9,11 @@ const mockBaasClient: jest.Mocked<MeetingBaasPort> = {
   leaveBot: jest.fn()
 };
 
-jest.unstable_mockModule('@/services/meetingbaas.service.js', () => ({
+jest.unstable_mockModule('../../src/services/meetingbaas.service.js', () => ({
   getMeetingBaasForUser: jest.fn(() => mockBaasClient)
 }));
 
-jest.unstable_mockModule('@/services/ws-relay.service.js', () => ({
+jest.unstable_mockModule('../../src/services/ws-relay.service.js', () => ({
   getRelayStats: jest.fn(() => ({ activeSessions: 0, sessions: [] })),
   setupWebSocketRelay: jest.fn()
 }));
@@ -22,7 +22,7 @@ describe('POST /v1/bots', () => {
   let getMeetingBaasForUser: jest.MockedFunction<any>;
 
   beforeEach(async () => {
-    const meetingBaasModule = await import('@/services/meetingbaas.service.js');
+    const meetingBaasModule = await import('../../src/services/meetingbaas.service.js');
     getMeetingBaasForUser = meetingBaasModule.getMeetingBaasForUser as jest.MockedFunction<any>;
     getMeetingBaasForUser.mockReturnValue(mockBaasClient);
   });

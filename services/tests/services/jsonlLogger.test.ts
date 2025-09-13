@@ -1,4 +1,3 @@
-// Jest globals are available without import
 import { readFileSync, existsSync, rmSync, mkdirSync } from "fs";
 import { join } from "path";
 import { TranscriptLogger } from "../../src/utils/transcript-logger.js";
