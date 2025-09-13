@@ -1,4 +1,4 @@
-import { writeFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
+import { appendFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
 /**
@@ -47,10 +47,10 @@ export class TranscriptLogger {
   /**
    * Log error to file
    */
-  logError(error: any, context?: any) {
+  logError(error: unknown, context?: unknown) {
     const logEntry = {
       type: 'error',
-      error: error.message || error,
+      error: error instanceof Error ? error.message : String(error),
       context,
       timestamp: new Date().toISOString(),
     };

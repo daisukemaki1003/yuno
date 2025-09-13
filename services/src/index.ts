@@ -82,7 +82,7 @@ if (process.env.NODE_ENV !== "production") {
         const logger = new Logger(randomUUID());
         
         // Parse URL and check path
-        const url = new URL(request.url!, `http://localhost:${PORT}`);
+        const url = new URL(request.url || '/', `http://localhost:${PORT}`);
         
         // Only accept connections to /mb-input
         if (url.pathname === "/mb-input") {
@@ -119,7 +119,7 @@ if (process.env.NODE_ENV !== "production") {
         logger.info("WebSocket client connected", { path: request.url });
 
         // Extract meetingId from query parameters if available
-        const url = new URL(request.url!, `http://localhost:${PORT}`);
+        const url = new URL(request.url || '/', `http://localhost:${PORT}`);
         const meetingId = url.searchParams.get('meetingId');
 
         // Import and initialize the WebSocket relay handler

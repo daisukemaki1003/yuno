@@ -1,11 +1,11 @@
-import { Logger } from '@/utils/logger.js';
-import { internal } from '@/utils/errors.js';
+import { Logger } from "@/utils/logger.js";
+import { internal } from "@/utils/errors.js";
 
 /**
  * HTTP client options
  */
 export interface HttpOptions {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method: "GET" | "POST" | "PUT" | "DELETE";
   headers?: Record<string, string>;
   body?: unknown;
   timeoutMs?: number;
@@ -18,14 +18,14 @@ export interface HttpOptions {
 export class HttpClient {
   private logger: Logger;
   private static readonly SENSITIVE_HEADERS = [
-    'authorization',
-    'x-api-key',
-    'api-key',
-    'x-gladia-key',
-    'x-auth-token',
-    'x-meeting-baas-api-key',
-    'cookie',
-    'set-cookie'
+    "authorization",
+    "x-api-key",
+    "api-key",
+    "x-gladia-key",
+    "x-auth-token",
+    "x-meeting-baas-api-key",
+    "cookie",
+    "set-cookie",
   ];
 
   constructor(logger: Logger) {
@@ -39,7 +39,7 @@ export class HttpClient {
     const masked: Record<string, string> = {};
     for (const [key, value] of Object.entries(headers)) {
       if (HttpClient.SENSITIVE_HEADERS.includes(key.toLowerCase())) {
-        masked[key] = '***';
+        masked[key] = "***";
       } else {
         masked[key] = value;
       }
@@ -53,21 +53,18 @@ export class HttpClient {
    * @param options - Request options
    * @returns Parsed JSON response
    */
-  async fetchJson<T = unknown>(
-    url: string,
-    options: HttpOptions
-  ): Promise<T> {
+  async fetchJson<T = unknown>(url: string, options: HttpOptions): Promise<T> {
     const { method, headers = {}, body, timeoutMs = 30000, retryCount = 2 } = options;
 
     let lastError: Error | null = null;
-    
+
     for (let attempt = 0; attempt < retryCount; attempt++) {
       try {
-        this.logger.debug('HTTP request', { 
-          url, 
-          method, 
+        this.logger.debug("HTTP request", {
+          url,
+          method,
           attempt,
-          headers: this.maskHeaders(headers)
+          headers: this.maskHeaders(headers),
         });
 
         const controller = new AbortController();
@@ -76,7 +73,7 @@ export class HttpClient {
         const response = await fetch(url, {
           method,
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
             ...headers,
           },
           body: body ? JSON.stringify(body) : undefined,
@@ -86,14 +83,14 @@ export class HttpClient {
         clearTimeout(timeout);
 
         const responseText = await response.text();
-        
+
         if (!response.ok) {
           // Log error response
-          this.logger.warn('HTTP error response', {
+          this.logger.warn("HTTP error response", {
             url,
             status: response.status,
             body: responseText,
-            headers: this.maskHeaders(headers)
+            headers: this.maskHeaders(headers),
           });
 
           // Retry on 5xx errors
@@ -103,41 +100,37 @@ export class HttpClient {
             continue;
           }
 
-          throw internal(
-            'HTTP_ERROR',
-            `HTTP request failed: ${response.status}`,
-            {
-              status: response.status,
-              body: responseText,
-              url,
-            }
-          );
+          throw internal("HTTP_ERROR", `HTTP request failed: ${response.status}`, {
+            status: response.status,
+            body: responseText,
+            url,
+          });
         }
 
         // Parse JSON response
         try {
           return JSON.parse(responseText) as T;
-        } catch (err) {
-          throw internal('PARSE_ERROR', 'Failed to parse JSON response', {
+        } catch {
+          throw internal("PARSE_ERROR", "Failed to parse JSON response", {
             responseText,
             url,
           });
         }
       } catch (err) {
         if (err instanceof Error) {
-          if (err.name === 'AbortError') {
-            lastError = internal('TIMEOUT_ERROR', `Request timeout after ${timeoutMs}ms`, { url });
+          if (err.name === "AbortError") {
+            lastError = internal("TIMEOUT_ERROR", `Request timeout after ${timeoutMs}ms`, { url });
           } else {
             lastError = err;
           }
-          
+
           // Retry on network errors
           if (attempt < retryCount - 1) {
-            this.logger.warn('HTTP request failed, retrying', {
+            this.logger.warn("HTTP request failed, retrying", {
               url,
               attempt,
               error: err.message,
-              headers: this.maskHeaders(headers)
+              headers: this.maskHeaders(headers),
             });
             await this.sleep(1000 * (attempt + 1));
             continue;
@@ -147,9 +140,8 @@ export class HttpClient {
       }
     }
 
-    throw lastError || internal('HTTP_ERROR', 'All retry attempts failed');
+    throw lastError || internal("HTTP_ERROR", "All retry attempts failed");
   }
-
 
   /**
    * POST request helper
@@ -160,14 +152,13 @@ export class HttpClient {
     options?: { headers?: Record<string, string>; timeoutMs?: number; retryCount?: number }
   ): Promise<T> {
     return this.fetchJson<T>(url, {
-      method: 'POST',
+      method: "POST",
       body,
       ...options,
     });
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
-

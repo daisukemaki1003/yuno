@@ -144,7 +144,7 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
     if (err instanceof Error) {
       // Check if it's an HTTP error with details
       if ("details" in err && typeof err.details === "object" && err.details) {
-        const details = err.details as any;
+        const details = err.details as { status?: number };
         if (details.status === 400) {
           return badRequest("VENDOR_ERROR", err.message, details);
         }

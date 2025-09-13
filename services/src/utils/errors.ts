@@ -90,16 +90,16 @@ export const errorHandler = (err: Error, ctx: Context): Response => {
   const logger = ctx.get('logger' as never);
   if (logger && typeof logger === 'object' && 'error' in logger && 'warn' in logger) {
     if (status === 500) {
-      const logData: any = { 
+      const logData: Record<string, unknown> = { 
         error: err.message,
         stack: err.stack,
       };
       if (err instanceof HttpError && err.details) {
         logData.details = err.details;
       }
-      (logger as any).error('Internal server error', logData);
+      (logger as { error: (msg: string, data: unknown) => void }).error('Internal server error', logData);
     } else {
-      (logger as any).warn('HTTP error', {
+      (logger as { warn: (msg: string, data: unknown) => void }).warn('HTTP error', {
         status,
         code: body.error.code,
         message: body.error.message,
@@ -107,5 +107,5 @@ export const errorHandler = (err: Error, ctx: Context): Response => {
     }
   }
 
-  return ctx.json(body, status as any);
+  return ctx.json(body, status as 400 | 401 | 403 | 404 | 500);
 };

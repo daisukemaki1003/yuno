@@ -8,7 +8,7 @@ export const router = new Hono();
 
 // Health check endpoint
 router.get('/healthz', async (c) => {
-  const health: any = {
+  const health: Record<string, unknown> = {
     status: 'ok',
     streamMode: 'ws-relay',
   };
@@ -17,7 +17,7 @@ router.get('/healthz', async (c) => {
   try {
     const { getRelayStats } = await import('@/services/ws-relay.service.js');
     health.wsRelay = getRelayStats();
-  } catch (error) {
+  } catch {
     health.wsRelay = { error: 'Failed to get relay stats' };
   }
 

@@ -19,7 +19,7 @@ interface GladiaTranscriptEvent {
       language?: string;
       start?: number;
       end?: number;
-      words?: any[];
+      words?: unknown[];
       confidence?: number;
     };
     transcript?: string;
@@ -130,9 +130,9 @@ async function connectToGladia(session: RelaySession): Promise<WebSocket> {
   session.generation = myGeneration;
 
   return new Promise((resolve, reject) => {
-    logger.info("Connecting to Gladia WebSocket", { url: maskToken(session.gladiaUrl!) });
+    logger.info("Connecting to Gladia WebSocket", { url: maskToken(session.gladiaUrl || '') });
 
-    const ws = new WebSocket(session.gladiaUrl!, {
+    const ws = new WebSocket(session.gladiaUrl || '', {
       perMessageDeflate: false,
       handshakeTimeout: 10000
     });
@@ -325,7 +325,8 @@ function scheduleReconnect(session: RelaySession) {
 
       // Process queued audio
       while (session.audioQueue.length > 0) {
-        const chunk = session.audioQueue.shift()!;
+        const chunk = session.audioQueue.shift();
+        if (!chunk) continue;
         session.audioQueueBytes -= chunk.length;
         sendAudioToGladia(session, chunk);
       }
@@ -352,7 +353,8 @@ function sendAudioToGladia(session: RelaySession, audioData: Buffer) {
     const maxBuffer = env.STREAM_BACKPRESSURE_MAX_BUFFER || 5242880; // 5MB
 
     while (session.audioQueueBytes > maxBuffer && audioQueue.length > 1) {
-      const dropped = audioQueue.shift()!;
+      const dropped = audioQueue.shift();
+      if (!dropped) break;
       session.audioQueueBytes -= dropped.length;
       logger.warn("Dropped audio frame due to backpressure", {
         droppedSize: dropped.length,
@@ -393,7 +395,8 @@ function sendAudioToGladia(session: RelaySession, audioData: Buffer) {
 export async function setupWebSocketRelay(ws: WebSocket, logger: Logger, meetingId?: string) {
   // Check if meetingId already has an active session
   if (meetingId && meetingIdToSession.has(meetingId)) {
-    const existingSession = meetingIdToSession.get(meetingId)!;
+    const existingSession = meetingIdToSession.get(meetingId);
+    if (!existingSession) return;
     if (existingSession.mbWs.readyState === WebSocket.OPEN) {
       logger.warn("Meeting already has an active session", { meetingId });
       ws.close(1008, "Meeting already has an active session");
@@ -463,7 +466,7 @@ export async function setupWebSocketRelay(ws: WebSocket, logger: Logger, meeting
         if (message.meetingId) {
           session.meetingId = message.meetingId;
         }
-      } catch (error) {
+      } catch {
         logger.warn("Received non-JSON text message", { data: data.toString() });
       }
     }
@@ -522,7 +525,15 @@ function cleanupSession(session: RelaySession) {
 export function getRelayStats() {
   const stats = {
     activeSessions: relaySessions.size,
-    sessions: [] as any[],
+    sessions: [] as Array<{
+      mbConnected: boolean;
+      gladiaConnected: boolean;
+      queuedAudioFrames: number;
+      queuedAudioBytes: number;
+      reconnectAttempts: number;
+      lastActivity: Date;
+      meetingId?: string;
+    }>,
   };
 
   relaySessions.forEach((session, ws) => {

@@ -29,6 +29,6 @@ module.exports = {
     "*.cjs",
     ".eslintrc.cjs",
     "jest.config.ts",
-    "tests/setup.ts"
+    "tests/**/*"
   ]
 };
