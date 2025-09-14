@@ -34,13 +34,14 @@ beforeAll(() => {
   global.console.error = jest.fn((...args: any[]) => {
     // Only log actual errors, not expected ones
     if (!args[0]?.toString().includes('Expected')) {
-      originalError(...args);
+      // Suppress error logs during tests
+      // originalError(...args);
     }
   });
   
   global.console.warn = jest.fn((...args: any[]) => {
-    // Only log actual warnings
-    originalWarn(...args);
+    // Suppress warning logs during tests
+    // originalWarn(...args);
   });
 });
 

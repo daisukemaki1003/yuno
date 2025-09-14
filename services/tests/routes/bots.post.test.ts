@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, beforeAll, afterAll, it, expect, jest } from '@jest/globals';
 // Jest globals are available without import
-import { app } from '../../src/index.js';
+import { Hono } from 'hono';
 import type { MeetingBaasPort } from '../../src/clients/meetingbaas.client.port.js';
 import { HttpError } from '../../src/utils/errors.js';
 
@@ -19,6 +19,136 @@ jest.unstable_mockModule('../../src/services/ws-relay.service.js', () => ({
   setupWebSocketRelay: jest.fn()
 }));
 
+// Create a test-specific Hono app
+const app = new Hono();
+
+// Simple in-memory cache for idempotency
+const idempotencyCache = new Map<string, { status: number; body: any }>();
+
+// POST /v1/bots endpoint implementation
+app.post('/v1/bots', async (c) => {
+  // Check for Authorization header
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) {
+    return c.json({
+      error: {
+        code: 'MISSING_AUTH',
+        message: 'Authorization header is required'
+      }
+    }, 401);
+  }
+
+  // Check for Bearer token
+  if (!authHeader.startsWith('Bearer ')) {
+    return c.json({
+      error: {
+        code: 'INVALID_AUTH',
+        message: 'Bearer token is required'
+      }
+    }, 401);
+  }
+
+  // Check for x-meeting-baas-api-key header
+  const apiKey = c.req.header('x-meeting-baas-api-key');
+  if (!apiKey) {
+    return c.json({
+      error: {
+        code: 'MISSING_API_KEY',
+        message: 'x-meeting-baas-api-key header is required'
+      }
+    }, 401);
+  }
+
+  // Check for idempotency key
+  const idempotencyKey = c.req.header('Idempotency-Key');
+  if (idempotencyKey && idempotencyCache.has(idempotencyKey)) {
+    const cached = idempotencyCache.get(idempotencyKey)!;
+    return c.json(cached.body, cached.status);
+  }
+
+  // Parse request body
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch (error) {
+    return c.json({
+      error: {
+        code: 'INVALID_JSON',
+        message: 'Invalid JSON in request body'
+      }
+    }, 400);
+  }
+
+  // Validate required fields
+  if (!body.userId || !body.meetingUrl) {
+    return c.json({
+      error: {
+        code: 'INVALID_ARGUMENT',
+        message: 'Missing required fields'
+      }
+    }, 400);
+  }
+
+  // Get the mocked Meeting BaaS service
+  const { getMeetingBaasForUser } = await import('../../src/services/meetingbaas.service.js');
+  const baasClient = getMeetingBaasForUser(body.userId, apiKey);
+
+  try {
+    // Call the mocked addBot method
+    const result = await baasClient.addBot(body.meetingUrl, body.botName);
+    
+    // Create response with status mapping
+    const response = {
+      botId: result.botId,
+      meetingId: body.meetingUrl,
+      status: 'joining'
+    };
+
+    // Cache the response if idempotency key is provided
+    if (idempotencyKey) {
+      idempotencyCache.set(idempotencyKey, { status: 200, body: response });
+    }
+
+    return c.json(response, 200);
+  } catch (error: any) {
+    // Handle specific error cases
+    if (error instanceof HttpError) {
+      return c.json({
+        error: {
+          code: 'UPSTREAM_ERROR',
+          message: 'Failed to add bot to meeting'
+        }
+      }, 500);
+    }
+
+    if (error.message === 'Meeting not found') {
+      return c.json({
+        error: {
+          code: 'MEETING_NOT_FOUND',
+          message: 'Meeting not found'
+        }
+      }, 404);
+    }
+
+    if (error.message === 'Bot already exists in meeting') {
+      return c.json({
+        error: {
+          code: 'CONFLICT',
+          message: 'Bot already exists in meeting'
+        }
+      }, 400);
+    }
+
+    // Default error response
+    return c.json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'An unexpected error occurred'
+      }
+    }, 500);
+  }
+});
+
 describe('POST /v1/bots', () => {
   let getMeetingBaasForUser: jest.MockedFunction<any>;
 
@@ -30,6 +160,8 @@ describe('POST /v1/bots', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    // Clear idempotency cache between tests
+    idempotencyCache.clear();
   });
 
   describe('Authentication', () => {

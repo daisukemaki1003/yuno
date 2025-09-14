@@ -1,5 +1,5 @@
 import { Logger } from "@/utils/logger.js";
-import { internal } from "@/utils/errors.js";
+import { internal, HttpError } from "@/utils/errors.js";
 
 /**
  * HTTP client options
@@ -93,14 +93,14 @@ export class HttpClient {
             headers: this.maskHeaders(headers),
           });
 
-          // Retry on 5xx errors
+          // Only retry on 5xx errors (server errors)
           if (response.status >= 500 && attempt < retryCount - 1) {
             lastError = new Error(`HTTP ${response.status}: ${responseText}`);
             await this.sleep(1000 * (attempt + 1)); // Exponential backoff
             continue;
           }
 
-          throw internal("HTTP_ERROR", `HTTP request failed: ${response.status}`, {
+          throw new HttpError(response.status, "HTTP_ERROR", `HTTP request failed: ${response.status}`, {
             status: response.status,
             body: responseText,
             url,
@@ -117,14 +117,20 @@ export class HttpClient {
           });
         }
       } catch (err) {
+        // Don't retry HttpErrors (client errors)
+        if (err instanceof HttpError) {
+          throw err;
+        }
+        
         if (err instanceof Error) {
           if (err.name === "AbortError") {
-            lastError = internal("TIMEOUT_ERROR", `Request timeout after ${timeoutMs}ms`, { url });
+            // Don't retry on timeout errors
+            throw internal("TIMEOUT_ERROR", `Request timeout after ${timeoutMs}ms`, { url });
           } else {
             lastError = err;
           }
 
-          // Retry on network errors
+          // Retry on network errors (but not timeout errors or HTTP errors)
           if (attempt < retryCount - 1) {
             this.logger.warn("HTTP request failed, retrying", {
               url,

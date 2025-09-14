@@ -3,7 +3,7 @@ import type { MeetingId, BotId } from "./meetingbaas.client.types.js";
 import type { MeetingBaasConfig } from "./meetingbaas.config.js";
 import { HttpClient } from "./http.client.js";
 import { Logger } from "@/utils/logger.js";
-import { badRequest, internal } from "@/utils/errors.js";
+import { badRequest, internal, HttpError } from "@/utils/errors.js";
 import { VendorAddBotResponseSchema } from "@/schemas/vendor/meetingbaas.v1.js";
 import { env } from "@/configs/env.js";
 
@@ -68,6 +68,10 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       const parsed = VendorAddBotResponseSchema.parse(response);
       return { botId: parsed.botId };
     } catch (err) {
+      // If it's already an HttpError, just re-throw it
+      if (err instanceof HttpError) {
+        throw err;
+      }
       this.logger.error("Failed to add bot", {
         meetingUrl,
         botName,
@@ -104,6 +108,10 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
         timeoutMs: this.config.timeouts.requestMs,
       });
     } catch (err) {
+      // If it's already an HttpError, just re-throw it
+      if (err instanceof HttpError) {
+        throw err;
+      }
       this.logger.error("Failed to leave bot", { meetingId, botId, error: err });
       throw this.mapError(err);
     }

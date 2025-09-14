@@ -46,6 +46,11 @@ describe('Meeting BaaS Client/Adapter', () => {
     adapter = createMeetingBaasAdapter(testConfig, testApiKey);
   });
 
+  afterEach(() => {
+    // Reset all mocks to prevent test interference
+    mockFetch.mockReset();
+  });
+
   describe('addBot', () => {
     it('should send correct request to Meeting BaaS', async () => {
       mockFetch.mockResolvedValueOnce({
@@ -118,20 +123,30 @@ describe('Meeting BaaS Client/Adapter', () => {
     });
 
     it('should apply timeout correctly', async () => {
-      // Mock a slow response
-      mockFetch.mockImplementationOnce(() => 
-        new Promise((resolve) => {
-          setTimeout(() => {
+      // Mock a slow response that respects AbortSignal
+      mockFetch.mockImplementationOnce((url, options) => 
+        new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
             resolve({
               ok: true,
               text: async () => JSON.stringify({ botId: 'bot-timeout' }),
             } as Response);
           }, 10000); // Longer than timeout
+
+          // Listen to abort signal
+          if (options?.signal) {
+            options.signal.addEventListener('abort', () => {
+              clearTimeout(timeout);
+              const abortError = new Error('The operation was aborted');
+              abortError.name = 'AbortError';
+              reject(abortError);
+            });
+          }
         })
       );
 
       await expect(adapter.addBot('https://meet.example.com/timeout'))
-        .rejects.toThrow();
+        .rejects.toThrow('Request timeout');
     });
 
     describe('Error Handling', () => {
@@ -169,7 +184,8 @@ describe('Meeting BaaS Client/Adapter', () => {
       });
 
       it('should handle 5xx errors', async () => {
-        mockFetch.mockResolvedValueOnce({
+        // Mock multiple times for retries
+        mockFetch.mockResolvedValue({
           ok: false,
           status: 500,
           text: async () => 'Internal Server Error',
@@ -180,7 +196,8 @@ describe('Meeting BaaS Client/Adapter', () => {
       });
 
       it('should handle network errors', async () => {
-        mockFetch.mockRejectedValueOnce(new Error('Network error'));
+        // Mock multiple times for retries
+        mockFetch.mockRejectedValue(new Error('Network error'));
 
         await expect(adapter.addBot('https://meet.example.com/network'))
           .rejects.toThrow('Network error');
@@ -331,14 +348,24 @@ describe('Meeting BaaS Client/Adapter', () => {
     it('should respect request timeout from config', async () => {
       const startTime = Date.now();
       
-      mockFetch.mockImplementationOnce(() => 
-        new Promise((resolve) => {
-          setTimeout(() => {
+      mockFetch.mockImplementationOnce((url, options) => 
+        new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
             resolve({
               ok: true,
               text: async () => JSON.stringify({ botId: 'bot-slow' }),
             } as Response);
           }, 10000); // 10 seconds
+
+          // Listen to abort signal
+          if (options?.signal) {
+            options.signal.addEventListener('abort', () => {
+              clearTimeout(timeout);
+              const abortError = new Error('The operation was aborted');
+              abortError.name = 'AbortError';
+              reject(abortError);
+            });
+          }
         })
       );
 
