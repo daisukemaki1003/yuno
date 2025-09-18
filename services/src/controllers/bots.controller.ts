@@ -10,7 +10,7 @@ import { badRequest, notFound, internal } from "@/utils/errors.js";
 import type { Logger } from "@/utils/logger.js";
 
 // Simple in-memory idempotency cache (5 minutes TTL)
-const idempotencyCache = new Map<string, { response: any; timestamp: number }>();
+const idempotencyCache = new Map<string, { response: AddBotResponse; timestamp: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Clean up old cache entries periodically
@@ -29,6 +29,7 @@ setInterval(() => {
 export async function addBot(c: Context): Promise<Response> {
   const logger = c.get("logger") as Logger;
   const apiKey = c.get("meetingBaasApiKey") as string;
+  
 
   // Check idempotency key
   const idempotencyKey = c.req.header("Idempotency-Key");

@@ -17,26 +17,23 @@ const envSchema = z.object({
   FIRESTORE_EMULATOR_HOST: z.string().optional(),
   
   // Meeting BaaS configuration
-  MEETING_BAAS_API_VERSION: z.string().optional(),
-  MEETING_BAAS_AUTH_HEADER: z.string().default('Authorization'),
-  MEETING_BAAS_AUTH_SCHEME: z.enum(['Bearer', 'ApiKey', 'Basic', 'None']).optional(),
   MEETING_BAAS_TIMEOUT_REQUEST_MS: z
     .string()
     .transform((val) => parseInt(val, 10))
     .refine((val) => !isNaN(val) && val > 0)
+    .default(15000)
     .optional()
     .or(z.number().optional()),
   MEETING_BAAS_TIMEOUT_STREAM_MS: z
     .string()
     .transform((val) => parseInt(val, 10))
     .refine((val) => !isNaN(val) && val > 0)
+    .default(600000)
     .optional()
     .or(z.number().optional()),
-  MEETING_BAAS_STREAM_PROTOCOL: z.enum(['ws', 'sse', 'ws-relay']).optional(),
-
-  // Gladia configuration
-  GLADIA_API_KEY: z.string().optional(),
-  PUBLIC_WS_BASE: z.string().optional(),
+  // Gladia configuration (required for WebSocket relay)
+  GLADIA_API_KEY: z.string().min(1, 'GLADIA_API_KEY is required'),
+  PUBLIC_WS_BASE: z.string().min(1, 'PUBLIC_WS_BASE is required'),
   
   // WebSocket relay configuration
   STREAM_RECONNECT_BASE_MS: z
@@ -55,6 +52,14 @@ const envSchema = z.object({
     .refine((val) => !isNaN(val) && val > 0)
     .default(5242880) // 5MB
     .optional(),
+  GLADIA_SEND_WS_CONFIG: z
+    .union([z.literal('true'), z.literal('false'), z.boolean()])
+    .transform((val) => val === 'true' || val === true)
+    .default(false)
+    .optional(),
+  
+  // WebSocket relay security
+  WS_RELAY_AUTH_TOKEN: z.string().optional(),
 });
 
 /**

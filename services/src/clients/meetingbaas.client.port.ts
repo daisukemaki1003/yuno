@@ -4,32 +4,7 @@
  * Vendor implementations should adapt to this interface
  */
 
-import type { MeetingId, BotId, RecordingFrame } from './meetingbaas.client.types.js';
-
-/**
- * Recording stream interface for real-time data
- */
-export interface RecordingStream {
-  /**
-   * Close the stream
-   */
-  close(): void;
-
-  /**
-   * Register callback for incoming data frames
-   */
-  onData(cb: (frame: RecordingFrame) => void): void;
-
-  /**
-   * Register callback for errors
-   */
-  onError(cb: (err: Error) => void): void;
-
-  /**
-   * Register callback for stream closure
-   */
-  onClose(cb: () => void): void;
-}
+import type { MeetingId, BotId } from './meetingbaas.client.types.js';
 
 /**
  * Meeting BaaS Port - stable interface for bot operations
@@ -49,16 +24,4 @@ export interface MeetingBaasPort {
    * @param botId - The bot to remove
    */
   leaveBot(meetingId: MeetingId, botId: BotId): Promise<void>;
-
-  /**
-   * Open a recording stream for a meeting
-   * @param meetingId - The meeting to stream
-   * @param opts - Stream options
-   * @param opts.normalized - If true, normalize vendor events to standard format
-   * @returns Recording stream interface
-   */
-  openRecordingStream(
-    meetingId: MeetingId, 
-    opts?: { normalized?: boolean }
-  ): Promise<RecordingStream>;
 }

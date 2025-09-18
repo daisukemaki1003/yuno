@@ -1,16 +1,11 @@
-import type { MeetingBaasPort, RecordingStream } from "./meetingbaas.client.port.js";
-import type { MeetingId, BotId, RecordingFrame } from "./meetingbaas.client.types.js";
+import type { MeetingBaasPort } from "./meetingbaas.client.port.js";
+import type { MeetingId, BotId } from "./meetingbaas.client.types.js";
 import type { MeetingBaasConfig } from "./meetingbaas.config.js";
-import { HttpClient, SseStream, WsStream } from "./http.client.js";
+import { HttpClient } from "./http.client.js";
 import { Logger } from "@/utils/logger.js";
-import { badRequest, internal } from "@/utils/errors.js";
-import {
-  VendorAddBotResponseSchema,
-  parseVendorStreamEvent,
-  VendorAudioEventSchema,
-  VendorTranscriptEventSchema,
-} from "@/schemas/vendor/meetingbaas.v1.js";
-import { createParser } from "eventsource-parser";
+import { badRequest, internal, HttpError } from "@/utils/errors.js";
+import { VendorAddBotResponseSchema } from "@/schemas/vendor/meetingbaas.v1.js";
+import { env } from "@/configs/env.js";
 
 /**
  * Create Meeting BaaS adapter with given configuration
@@ -56,9 +51,9 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
         waiting_room_timeout: 600,
       },
       streaming: {
-        audio_frequency: "16khz",
-        input: `${process.env.PUBLIC_WS_BASE}/mb-input`,
-        output: null,
+        audio_frequency: "16khz", // Meeting BaaS uses "16khz", not sample_rate
+        input: `${env.PUBLIC_WS_BASE}/mb-input`,
+        output: `${env.PUBLIC_WS_BASE}/mb-input`, // Same as input for now
       },
     };
 
@@ -73,7 +68,30 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       const parsed = VendorAddBotResponseSchema.parse(response);
       return { botId: parsed.botId };
     } catch (err) {
-      this.logger.error("Failed to add bot", { meetingUrl, botName, error: err });
+      // If it's already an HttpError, just re-throw it
+      if (err instanceof HttpError) {
+        throw err;
+      }
+      this.logger.error("Failed to add bot", {
+        meetingUrl,
+        botName,
+        error: err,
+        requestBody,
+        url,
+        headers: Object.keys(headers).reduce((acc, key) => {
+          const lowerKey = key.toLowerCase();
+          if (
+            lowerKey.includes("key") ||
+            lowerKey.includes("authorization") ||
+            lowerKey === "x-api-key"
+          ) {
+            acc[key] = "***";
+          } else {
+            acc[key] = headers[key];
+          }
+          return acc;
+        }, {} as Record<string, string>),
+      });
       throw this.mapError(err);
     }
   }
@@ -86,34 +104,15 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       await this.http.fetchJson(url, {
         method: this.config.endpoints.leaveBot.method,
         headers,
-        body: this.config.endpoints.leaveBot.method === "POST" ? { meetingId } : undefined,
+        // Don't send body for leaveBot
         timeoutMs: this.config.timeouts.requestMs,
       });
     } catch (err) {
-      this.logger.error("Failed to leave bot", { meetingId, botId, error: err });
-      throw this.mapError(err);
-    }
-  }
-
-  async openRecordingStream(
-    meetingId: MeetingId,
-    opts?: { normalized?: boolean }
-  ): Promise<RecordingStream> {
-    const url = this.buildUrl(this.config.endpoints.stream.path, { meetingId });
-    const headers = this.buildHeaders();
-    const normalized = opts?.normalized ?? false;
-
-    try {
-      if (this.config.endpoints.stream.protocol === "sse") {
-        const stream = await this.http.openSse(url, headers, this.config.timeouts.streamMs);
-        return this.createSseRecordingStream(stream, normalized);
-      } else {
-        const stream = await this.http.openWebSocket(url, headers);
-        await stream.waitForOpen();
-        return this.createWsRecordingStream(stream, normalized);
+      // If it's already an HttpError, just re-throw it
+      if (err instanceof HttpError) {
+        throw err;
       }
-    } catch (err) {
-      this.logger.error("Failed to open recording stream", { meetingId, error: err });
+      this.logger.error("Failed to leave bot", { meetingId, botId, error: err });
       throw this.mapError(err);
     }
   }
@@ -138,21 +137,13 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
   }
 
   private buildHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
 
-    // Add auth header if not using query param
-    if (!this.config.auth.queryParam) {
-      const scheme = this.config.auth.scheme;
-      if (scheme === "Bearer") {
-        headers[this.config.auth.header] = `Bearer ${this.apiKey}`;
-      } else if (scheme === "ApiKey") {
-        headers[this.config.auth.header] = `ApiKey ${this.apiKey}`;
-      } else if (scheme === "Basic") {
-        headers[this.config.auth.header] = `Basic ${this.apiKey}`;
-      } else if (scheme === "None") {
-        headers[this.config.auth.header] = this.apiKey;
-      }
-    }
+    // Add auth header (Meeting BaaS uses x-meeting-baas-api-key header)
+    headers[this.config.auth.header] = this.apiKey;
 
     return headers;
   }
@@ -161,7 +152,7 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
     if (err instanceof Error) {
       // Check if it's an HTTP error with details
       if ("details" in err && typeof err.details === "object" && err.details) {
-        const details = err.details as any;
+        const details = err.details as { status?: number };
         if (details.status === 400) {
           return badRequest("VENDOR_ERROR", err.message, details);
         }
@@ -169,189 +160,5 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       return err;
     }
     return internal("UNKNOWN_ERROR", "An unknown error occurred");
-  }
-
-  private createSseRecordingStream(stream: SseStream, normalized: boolean): RecordingStream {
-    const handlers = {
-      data: new Set<(frame: RecordingFrame) => void>(),
-      error: new Set<(err: Error) => void>(),
-      close: new Set<() => void>(),
-    };
-
-    // SSE parser for handling event stream
-    const parser = createParser({
-      onEvent: (event) => {
-        if (event.data) {
-          try {
-            const data = JSON.parse(event.data);
-            const frame = this.parseStreamEvent(data, normalized);
-            handlers.data.forEach((h) => h(frame));
-          } catch (err) {
-            this.logger.error("Failed to parse SSE event", { error: err });
-            handlers.error.forEach((h) => h(err as Error));
-          }
-        }
-      },
-    });
-
-    stream.on("data", (data) => parser.feed(data));
-    stream.on("error", (err) => handlers.error.forEach((h) => h(err)));
-    stream.on("close", () => handlers.close.forEach((h) => h()));
-
-    return {
-      close: () => stream.close(),
-      onData: (cb) => {
-        handlers.data.add(cb);
-      },
-      onError: (cb) => {
-        handlers.error.add(cb);
-      },
-      onClose: (cb) => {
-        handlers.close.add(cb);
-      },
-    };
-  }
-
-  private createWsRecordingStream(stream: WsStream, normalized: boolean): RecordingStream {
-    const handlers = {
-      data: new Set<(frame: RecordingFrame) => void>(),
-      error: new Set<(err: Error) => void>(),
-      close: new Set<() => void>(),
-    };
-
-    stream.on("data", (data) => {
-      try {
-        const parsed = JSON.parse(data);
-        const frame = this.parseStreamEvent(parsed, normalized);
-        handlers.data.forEach((h) => h(frame));
-      } catch (err) {
-        this.logger.error("Failed to parse WebSocket message", { error: err });
-        handlers.error.forEach((h) => h(err as Error));
-      }
-    });
-
-    stream.on("error", (err) => handlers.error.forEach((h) => h(err)));
-    stream.on("close", () => handlers.close.forEach((h) => h()));
-
-    return {
-      close: () => stream.close(),
-      onData: (cb) => {
-        handlers.data.add(cb);
-      },
-      onError: (cb) => {
-        handlers.error.add(cb);
-      },
-      onClose: (cb) => {
-        handlers.close.add(cb);
-      },
-    };
-  }
-
-  private parseStreamEvent(data: unknown, normalized: boolean): RecordingFrame {
-    const { eventType, timestamp, raw } = parseVendorStreamEvent(
-      data,
-      this.config.maps.streamEvent
-    );
-
-    // In non-normalized mode, pass through as generic event
-    if (!normalized) {
-      return {
-        kind: "event",
-        ts: timestamp,
-        name: eventType,
-        payload: raw,
-        vendorRaw: raw,
-      };
-    }
-
-    // In normalized mode, try to parse specific event types
-    const maps = this.config.maps.streamEvent;
-
-    // Check if it's an audio event
-    if (eventType === "audio" || eventType === "audio_data") {
-      try {
-        const parsed = VendorAudioEventSchema.parse(raw);
-        const audioData = parsed[maps?.audioField || "audio"] || parsed.data;
-
-        if (audioData) {
-          // Convert audio data to Uint8Array
-          let bytes: Uint8Array;
-          if (typeof audioData === "string") {
-            // Base64 encoded
-            bytes = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0));
-          } else if (audioData instanceof ArrayBuffer) {
-            bytes = new Uint8Array(audioData);
-          } else if (audioData instanceof Uint8Array) {
-            bytes = audioData;
-          } else {
-            // Unknown format, pass as event
-            return {
-              kind: "event",
-              ts: timestamp,
-              name: eventType,
-              payload: raw,
-              vendorRaw: raw,
-            };
-          }
-
-          return {
-            kind: "audio",
-            ts: timestamp,
-            bytes,
-            codec: typeof parsed.codec === "string" ? parsed.codec : undefined,
-            vendorRaw: raw,
-          };
-        }
-      } catch (err) {
-        this.logger.warn("Failed to parse audio event", { error: err });
-      }
-    }
-
-    // Check if it's a transcript event
-    if (
-      eventType === "transcript" ||
-      eventType === "transcription" ||
-      eventType === "speech_to_text"
-    ) {
-      try {
-        const parsed = VendorTranscriptEventSchema.parse(raw);
-        const textFieldValue = parsed[maps?.textField || "text"] || parsed.transcript;
-        const text = typeof textFieldValue === "string" ? textFieldValue : "";
-
-        if (text) {
-          return {
-            kind: "transcript",
-            ts: timestamp,
-            text,
-            lang:
-              typeof parsed.lang === "string"
-                ? parsed.lang
-                : typeof parsed.language === "string"
-                ? parsed.language
-                : undefined,
-            isFinal:
-              typeof parsed.is_final === "boolean"
-                ? parsed.is_final
-                : typeof parsed.isFinal === "boolean"
-                ? parsed.isFinal
-                : typeof parsed.final === "boolean"
-                ? parsed.final
-                : undefined,
-            vendorRaw: raw,
-          };
-        }
-      } catch (err) {
-        this.logger.warn("Failed to parse transcript event", { error: err });
-      }
-    }
-
-    // Default: pass through as generic event
-    return {
-      kind: "event",
-      ts: timestamp,
-      name: eventType,
-      payload: raw,
-      vendorRaw: raw,
-    };
   }
 }

@@ -16,7 +16,7 @@ import { meetingBaasConfig } from '@/clients/meetingbaas.config.js';
  * @returns Meeting BaaS port instance
  */
 export async function getMeetingBaasForUser(
-  userId: string,
+  _userId: string,
   apiKeyPlain: string
 ): Promise<MeetingBaasPort> {
   // TODO: Replace with key-store integration
@@ -36,7 +36,7 @@ export async function getMeetingBaasForUser(
  * @param userId - User identifier
  * @returns true if user has valid Meeting BaaS credentials
  */
-export async function hasUserMeetingBaasAccess(userId: string): Promise<boolean> {
+export async function hasUserMeetingBaasAccess(_userId: string): Promise<boolean> {
   // TODO: Check with key-store if user has Meeting BaaS API key
   // For now, always return true for development
   return true;

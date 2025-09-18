@@ -81,15 +81,34 @@ if (process.env.NODE_ENV !== "production") {
       server.on("upgrade", (request, socket, head) => {
         const logger = new Logger(randomUUID());
         
+        // Parse URL and check path
+        const url = new URL(request.url || '/', `http://localhost:${PORT}`);
+        
         // Only accept connections to /mb-input
-        if (request.url === "/mb-input") {
-          logger.info("WebSocket upgrade request", { path: request.url });
+        if (url.pathname === "/mb-input") {
+          // Check authentication if configured
+          if (env.WS_RELAY_AUTH_TOKEN) {
+            const authToken = url.searchParams.get('auth') || request.headers['x-auth-token'];
+            
+            if (authToken !== env.WS_RELAY_AUTH_TOKEN) {
+              logger.warn("WebSocket upgrade rejected - unauthorized", { 
+                path: url.pathname,
+                providedAuth: authToken ? '***' : 'none'
+              });
+              socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+              socket.destroy();
+              return;
+            }
+          }
+          
+          logger.info("WebSocket upgrade request", { path: url.pathname });
           
           wss.handleUpgrade(request, socket, head, (ws) => {
             wss.emit("connection", ws, request);
           });
         } else {
-          logger.warn("WebSocket upgrade rejected", { path: request.url });
+          logger.warn("WebSocket upgrade rejected - invalid path", { path: url.pathname });
+          socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
           socket.destroy();
         }
       });
@@ -99,19 +118,28 @@ if (process.env.NODE_ENV !== "production") {
         const logger = new Logger(randomUUID());
         logger.info("WebSocket client connected", { path: request.url });
 
+        // Extract meetingId from query parameters if available
+        const url = new URL(request.url || '/', `http://localhost:${PORT}`);
+        const meetingId = url.searchParams.get('meetingId');
+
         // Import and initialize the WebSocket relay handler
-        const { setupWebSocketRelay } = await import("@/realtime/ws-relay.js");
-        await setupWebSocketRelay(ws, logger);
+        const { setupWebSocketRelay } = await import("@/services/ws-relay.service.js");
+        await setupWebSocketRelay(ws, logger, meetingId || undefined);
       });
 
       const logger = new Logger(randomUUID());
-      logger.info("Dev server started with WebSocket support", {
-        port: Number(PORT),
-        wsPath: "/mb-input",
-        env: {
-          PROJECT_ID: env.PROJECT_ID,
-          REGION: env.REGION,
-        },
+      
+      // Import transcript logger to show log file path
+      import("@/utils/transcript-logger.js").then(({ transcriptLogger }) => {
+        logger.info("Dev server started with WebSocket support", {
+          port: Number(PORT),
+          wsPath: "/mb-input",
+          transcriptLogFile: transcriptLogger.getLogFilePath(),
+          env: {
+            PROJECT_ID: env.PROJECT_ID,
+            REGION: env.REGION,
+          },
+        });
       });
     });
   });
