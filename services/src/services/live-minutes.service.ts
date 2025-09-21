@@ -360,7 +360,7 @@ async function initializeModel(): Promise<GenerativeModel> {
   return getFirebaseGenerativeModel(ai, {
     model: MINUTES_CONFIG.DEFAULT_GEMINI_MODEL,
     generationConfig,
-  });
+  }) as GenerativeModel;
 }
 
 // レート制御の待機などに使うシンプルなタイマー
@@ -444,8 +444,8 @@ function handleTranscript(event: unknown) {
     });
   }
 
-pruneWindow(state, timestamp);
-scheduleCandidate(meetingId, state);
+  pruneWindow(state, timestamp);
+  scheduleCandidate(meetingId, state);
 }
 
 // Gladia からの transcript を minutes 処理に流し込む
