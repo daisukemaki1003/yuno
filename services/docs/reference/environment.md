@@ -13,7 +13,7 @@
 | `MEETING_BAAS_TIMEOUT_STREAM_MS` | 任意 | `600000` | Meeting BaaS ストリーミングのタイムアウト (ms)。 |
 | `GLADIA_API_KEY` | 必須 | なし | Gladia Live API 認証キー。WebSocket リレーで使用します。 |
 | `PUBLIC_WS_BASE` | 必須 | なし | Meeting BaaS アダプターが WebSocket 入出力 URL を伝える際に利用するベース URL。 |
-| `GOOGLE_GENAI_API_KEY` | 必須 | なし | Gemini（Firebase AI）で JSON 出力を生成する際に利用する API キー。 |
+| `GOOGLE_GENAI_API_KEY` | 必須 | なし | Gemini（Generative Language API）で JSON 出力を生成する際に利用する API キー。 |
 | `STREAM_RECONNECT_BASE_MS` | 任意 | `5000` | Gladia 再接続時のベース遅延 (指数バックオフの初期値)。 |
 | `STREAM_BACKPRESSURE_MAX_BUFFER` | 任意 | `5242880` | 音声フレームのバッファ上限 (バイト数)。超過時は古いフレームを破棄します。 |
 | `GLADIA_SEND_WS_CONFIG` | 任意 | `false` | Gladia 接続後に初期設定メッセージを送信するかどうか。`true/false` 文字列または boolean。 |

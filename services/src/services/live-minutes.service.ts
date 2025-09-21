@@ -5,7 +5,6 @@ import { MINUTES_CONFIG, FILLER_WORDS, MAX_DIGEST_LENGTH } from "@/configs/minut
 import { transcriptEmitter } from "@/services/ws-relay.service.js";
 import { env } from "@/configs/env.js";
 import { Logger } from "@/utils/logger.js";
-import type { GenerativeModel, GenerativeModelResult } from "firebase/ai";
 
 export type TranscriptChunk = {
   meetingId: string;
@@ -60,6 +59,21 @@ const STATE_TTL_MS = MINUTES_CONFIG.STATE_TTL_MIN * 60 * 1000;
 
 const PROMPT_TEMPLATE = `直近の会話ダイジェスト:\n----\n{DIGEST}\n----\n出力は JSON のみ（summary と actions）。規定のスキーマに完全一致させてください。`;
 const MINUTES_EVENT = "minutes" as const;
+const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+
+type GeminiContentPart = {
+  text?: string;
+};
+
+type GeminiCandidate = {
+  content?: {
+    parts?: GeminiContentPart[];
+  };
+};
+
+type GeminiResponse = {
+  candidates?: GeminiCandidate[];
+};
 
 // 会議 ID ごとに minutes の状態を取得（存在しなければ初期化）
 function getOrCreateState(meetingId: string): MeetingState {
@@ -137,16 +151,32 @@ function buildDigest(state: MeetingState): DigestCandidate | null {
 }
 
 // digest が十分な長さで更新されているか、レート制御に引っ掛からないか確認
-function shouldProcessCandidate(state: MeetingState, candidate: DigestCandidate): boolean {
+function shouldProcessCandidate(
+  meetingId: string,
+  state: MeetingState,
+  candidate: DigestCandidate
+): boolean {
   if (!candidate.digest || candidate.digest.length < 40) {
+    minutesLogger.info("Skip digest: too short", {
+      meetingId,
+      length: candidate.digest?.length ?? 0,
+    });
     return false;
   }
 
   if (state.lastHash && candidate.digestHash === state.lastHash) {
+    minutesLogger.info("Skip digest: same hash as last emit", {
+      meetingId,
+      digestHash: candidate.digestHash,
+    });
     return false;
   }
 
   if (state.lastEmitAt && Date.now() - state.lastEmitAt < EMIT_INTERVAL_MS) {
+    minutesLogger.info("Skip digest: emit interval not elapsed", {
+      meetingId,
+      elapsedMs: Date.now() - state.lastEmitAt,
+    });
     return false;
   }
 
@@ -160,6 +190,12 @@ function scheduleCandidate(meetingId: string, state: MeetingState) {
   if (!candidate) {
     return;
   }
+
+  minutesLogger.info("Digest candidate queued", {
+    meetingId,
+    length: candidate.digest.length,
+    utteranceCount: state.utterances.length,
+  });
 
   state.nextCandidate = candidate;
   if (!state.processing) {
@@ -176,7 +212,7 @@ async function processQueue(meetingId: string, state: MeetingState) {
     const candidate = state.nextCandidate;
     state.nextCandidate = null;
 
-    if (!shouldProcessCandidate(state, candidate)) {
+    if (!shouldProcessCandidate(meetingId, state, candidate)) {
       continue;
     }
 
@@ -207,6 +243,11 @@ async function processQueue(meetingId: string, state: MeetingState) {
       }
       continue;
     }
+
+    minutesLogger.info("Minutes generated", {
+      meetingId,
+      digestLength: candidate.digest.length,
+    });
 
     state.lastLive = live;
     state.lastHash = candidate.digestHash;
@@ -246,121 +287,132 @@ async function summarizeWithRetry(
 
 // Gemini で JSON 出力を生成し、summary/actions をトリミング
 async function summarizeDigest(digest: string): Promise<LiveMinutes> {
-  // Gemini に JSON Schema を渡して minutes を生成
-  const model = await getGenerativeModel();
   const prompt = PROMPT_TEMPLATE.replace("{DIGEST}", digest);
-
-  const result = await withTimeout<GenerativeModelResult>(
-    model.generateContent(prompt),
-    MINUTES_CONFIG.REQUEST_TIMEOUT_MS
-  );
-
-  let jsonText: string | null = null;
-
-  if (typeof result?.response?.text === "function") {
-    jsonText = result.response.text();
-  }
-
-  if (!jsonText && result?.response?.candidates?.[0]?.content?.parts?.[0]?.text) {
-    jsonText = result.response.candidates[0].content.parts[0].text as string;
-  }
-
-  if (!jsonText) {
-    throw new Error("Gemini response missing JSON payload");
-  }
-
-  const parsed = JSON.parse(jsonText) as LiveMinutes;
-  parsed.summary = (parsed.summary ?? []).slice(0, MINUTES_CONFIG.MAX_SUMMARY);
-  parsed.actions = (parsed.actions ?? []).slice(0, MINUTES_CONFIG.MAX_ACTIONS);
-  return parsed;
+  const jsonText = await requestGeminiJson(prompt);
+  return normalizeLiveMinutes(jsonText);
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`Gemini request timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
+async function requestGeminiJson(prompt: string): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), MINUTES_CONFIG.REQUEST_TIMEOUT_MS);
 
-    promise
-      .then((value) => {
-        clearTimeout(timer);
-        resolve(value);
-      })
-      .catch((error) => {
-        clearTimeout(timer);
-        reject(error);
-      });
-  });
-}
-
-// GenerativeModel を初期化後キャッシュして再利用
-async function getGenerativeModel(): Promise<GenerativeModel> {
-  if (!globalModelPromise) {
-    globalModelPromise = initializeModel();
-  }
-  return globalModelPromise;
-}
-
-let globalModelPromise: Promise<GenerativeModel> | null = null;
-
-// Firebase アプリと GoogleAIBackend を構築し、JSON Schema を設定したモデルを返す
-async function initializeModel(): Promise<GenerativeModel> {
-  const [{ initializeApp }] = await Promise.all([import("firebase/app")]);
-
-  const firebaseConfig = {
-    projectId: env.PROJECT_ID,
-    apiKey: env.GOOGLE_GENAI_API_KEY,
-  } as Record<string, string>;
-
-  const firebaseApp = initializeApp(firebaseConfig);
-
-  const {
-    getAI,
-    getGenerativeModel: getFirebaseGenerativeModel,
-    GoogleAIBackend,
-    Schema,
-  } = await import("firebase/ai");
-
-  const ai = getAI(firebaseApp, {
-    backend: new GoogleAIBackend({
-      apiKey: env.GOOGLE_GENAI_API_KEY,
-    }),
-  });
-
-  const liveMinutesSchema = Schema.object({
-    properties: {
-      summary: Schema.array({
-        items: Schema.string(),
-        minItems: 3,
-        maxItems: MINUTES_CONFIG.MAX_SUMMARY,
-      }),
-      actions: Schema.array({
-        items: Schema.object({
-          properties: {
-            text: Schema.string(),
-            owner: Schema.string(),
-            due: Schema.string(),
+  const body = {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: prompt }],
+      },
+    ],
+    generationConfig: {
+      responseMimeType: "application/json",
+      temperature: MINUTES_CONFIG.TEMPERATURE,
+      maxOutputTokens: MINUTES_CONFIG.MAX_TOKENS,
+      responseSchema: {
+        type: "object",
+        properties: {
+          summary: {
+            type: "array",
+            items: { type: "string" },
           },
-          optionalProperties: ["owner", "due"],
-          requiredProperties: ["text"],
-        }),
-        maxItems: MINUTES_CONFIG.MAX_ACTIONS,
-      }),
+          actions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                text: { type: "string" },
+                owner: { type: "string" },
+                due: { type: "string" },
+              },
+              required: ["text"],
+            },
+          },
+        },
+        required: ["summary", "actions"],
+      },
     },
-    requiredProperties: ["summary", "actions"],
-  });
-
-  const generationConfig = {
-    responseMimeType: "application/json",
-    responseSchema: liveMinutesSchema,
-    temperature: MINUTES_CONFIG.TEMPERATURE,
-    maxOutputTokens: MINUTES_CONFIG.MAX_TOKENS,
   };
 
-  return getFirebaseGenerativeModel(ai, {
-    model: MINUTES_CONFIG.DEFAULT_GEMINI_MODEL,
-    generationConfig,
-  }) as GenerativeModel;
+  try {
+    const response = await fetch(
+      `${GEMINI_API_BASE}/${MINUTES_CONFIG.DEFAULT_GEMINI_MODEL}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-goog-api-key": env.GOOGLE_GENAI_API_KEY,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      throw new Error(
+        `Gemini request failed (${response.status} ${response.statusText})${
+          errorText ? `: ${errorText}` : ""
+        }`
+      );
+    }
+
+    const data = (await response.json()) as GeminiResponse;
+    const textPart = data.candidates
+      ?.flatMap((candidate) => candidate.content?.parts ?? [])
+      ?.find((part) => typeof part?.text === "string" && part.text.trim().length > 0);
+
+    if (!textPart?.text) {
+      throw new Error("Gemini response missing text candidate");
+    }
+
+    return textPart.text;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Gemini request timed out after ${MINUTES_CONFIG.REQUEST_TIMEOUT_MS}ms`);
+    }
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(String(error));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function normalizeLiveMinutes(jsonText: string): LiveMinutes {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(jsonText);
+  } catch (error) {
+    throw new Error(`Failed to parse Gemini JSON: ${jsonText}`);
+  }
+
+  const summaryRaw = Array.isArray((raw as Record<string, unknown>).summary)
+    ? ((raw as Record<string, unknown>).summary as unknown[])
+    : [];
+  const actionsRaw = Array.isArray((raw as Record<string, unknown>).actions)
+    ? ((raw as Record<string, unknown>).actions as unknown[])
+    : [];
+
+  const summary = summaryRaw
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    .map((item) => item.trim())
+    .slice(0, MINUTES_CONFIG.MAX_SUMMARY);
+
+  const actions = actionsRaw
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+    .map((item) => {
+      const text = typeof item.text === "string" ? item.text.trim() : "";
+      const owner = typeof item.owner === "string" && item.owner.trim().length > 0 ? item.owner.trim() : undefined;
+      const due = typeof item.due === "string" && item.due.trim().length > 0 ? item.due.trim() : undefined;
+      return { text, owner, due };
+    })
+    .filter((item) => item.text.length > 0)
+    .slice(0, MINUTES_CONFIG.MAX_ACTIONS);
+
+  return {
+    summary,
+    actions,
+  };
 }
 
 // レート制御の待機などに使うシンプルなタイマー
@@ -411,12 +463,33 @@ function handleTranscript(event: unknown) {
   }
 
   const confidence = chunk.confidence ?? 0;
-  if (!chunk.isFinal || chunk.language !== "ja" || confidence < MINUTES_CONFIG.CONF_MIN) {
+  const skipReasons: string[] = [];
+  if (!chunk.isFinal) {
+    skipReasons.push("not_final");
+  }
+  if (chunk.language !== "ja") {
+    skipReasons.push("unsupported_language");
+  }
+  if (confidence < MINUTES_CONFIG.CONF_MIN) {
+    skipReasons.push("low_confidence");
+  }
+
+  if (skipReasons.length > 0) {
+    minutesLogger.info("Transcript ignored", {
+      meetingId: chunk.meetingId,
+      reasons: skipReasons,
+      confidence,
+      language: chunk.language,
+    });
     return;
   }
 
   const cleanedText = normalizeText(chunk.text ?? "");
   if (!cleanedText) {
+    minutesLogger.info("Transcript ignored", {
+      meetingId: chunk.meetingId,
+      reasons: ["empty_after_normalize"],
+    });
     return;
   }
 
@@ -433,14 +506,27 @@ function handleTranscript(event: unknown) {
     lastUtterance.text = mergedText;
     lastUtterance.timestamp = timestamp;
     lastUtterance.hash = hashText(mergedText);
+    minutesLogger.info("Transcript merged", {
+      meetingId,
+      mergedLength: mergedText.length,
+    });
   } else {
     if (state.utterances.some((utterance) => utterance.hash === hash)) {
+      minutesLogger.info("Transcript ignored", {
+        meetingId,
+        reasons: ["duplicate_hash"],
+      });
       return;
     }
     state.utterances.push({
       text: cleanedText,
       timestamp,
       hash,
+    });
+    minutesLogger.info("Transcript accepted", {
+      meetingId,
+      length: cleanedText.length,
+      utteranceCount: state.utterances.length,
     });
   }
 
