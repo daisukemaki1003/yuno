@@ -10,9 +10,18 @@
 
 ---
 
+## 現状把握メモ（2025-02 時点リポジトリ）
+
+- `services/src/services/ws-relay.service.ts` が Gladia から受けた transcript を `transcriptEmitter` で配信している（`meetingId` を保持）。
+- SSE は既存の `GET /v1/meetings/:meetingId/stream`（`bearerAuth` + `extractMeetingBaasApiKey` 必須）で公開され、`hono/streaming` を使って `event: transcript`・`event: ping` を送信している。
+- `StreamQuerySchema` の `types` には現在 `audio, transcript, event` のみが許可されており、新しい種別 `minutes` を追加する必要がある。
+- `transcriptEmitter` から流れてくるデータには `confidence` が含まれていないため、前処理で信頼度フィルタを掛けるには `ws-relay.service.ts` 側で値を引き渡す修正が必要。
+- KEEP-ALIVE は `: ping` コメントと `event: ping`（20 秒間隔）で既に実装されているので、新しいイベントもこれに合わせる。
+
 ## 成果物（受け入れ基準 / DoD）
 
 - 文字起こしを投入すると、**最大 15 秒以内**に `minutes.partial` が 1 回以上届く。
+- 既存 SSE (`GET /v1/meetings/:meetingId/stream`) に `types` で `minutes` を指定し、Authorization / `x-meeting-baas-api-key` を付けると `event: minutes.partial` が受け取れる。
 - SSE ペイロードは **日本語の箇条書き 3〜5 行**の `summary` と **0〜3 件**の `actions`。
 - LLM 応答は**JSON Schema に適合**。崩れた場合は**1 回だけ自動再試行**し、それでも無理なら**直前の正常出力を再送**（黙るより安全）。
 - 同じ内容を連投しない（差分＆レート制御が有効）。
@@ -26,19 +35,24 @@
 
 ```json
 {
+  "meetingId": "meeting-123",
   "text": "デザインは後日共有します",
   "language": "ja",
   "isFinal": true,
   "confidence": 0.92,
-  "timestamp": "2025-09-13T04:54:11.749Z",
-  "loggedAt": "2025-09-13T04:54:11.749Z"
+  "timestamp": "2025-09-13T04:54:11.749Z"
 }
 ```
 
+> ※ `ws-relay.service.ts` の `transcriptEmitter.emit` で `confidence` を渡す修正を先に行うこと。ベンダーから来ない場合は `undefined` として扱い、フィルタ時は `0` 相当で落とす。
+
 ## 出力（SSE）
 
-- ルート：`GET /minutes/live?meetingId=...`
+- ルート：`GET /v1/meetings/:meetingId/stream?userId=...&types=minutes[,transcript]`
+  - 認証ヘッダー：`Authorization: Bearer ...` / `x-meeting-baas-api-key: ...`（既存 SSE と同等）
+  - `types` に複数指定する場合はカンマ区切り。`minutes` を含めたときだけ minutes 配信を受け取る。
 - イベント名：`minutes.partial`
+- keep-alive：既存実装に倣い `: ping` コメント + `event: ping`（20 秒間隔）を送る。
 - 例：
 
 ```json
@@ -62,9 +76,8 @@ export type TranscriptChunk = {
   text: string;
   language: string; // "ja"
   isFinal: boolean;
-  confidence: number; // 0..1
+  confidence?: number; // 0..1 (未提供時は undefined)
   timestamp: string; // ISO
-  loggedAt: string; // ISO
 };
 
 export type LiveMinutes = {
@@ -95,9 +108,18 @@ SMALL_MODEL_TEMP=0.2
 SMALL_MODEL_TIMEOUT_MS=4000
 ```
 
+> ※ `services/src/configs/env.ts` と `services/docs/reference/environment.md` への追記を忘れずに（`zod` バリデーション含む）。
+
 ---
 
 ## 実装タスク（最小・手戻り小）
+
+### 0) イベント配信レイヤーの下準備
+
+- `ws-relay.service.ts` の `transcriptEmitter.emit` へ `confidence` を追加し、SSE でも渡るようにする。
+- `StreamTypeSchema` / `StreamQuerySchema` に `minutes` 種別を追加。`types` 指定が無い場合は互換性のため従来どおり `audio,transcript,event` を返す。
+- `services/src/services` に minutes 専用サービスを用意し、`transcriptEmitter` を購読して minutes 更新を発火する `EventEmitter`（例: `liveMinutesEmitter`）と現在の `lastLive` を取得する API を提供する。
+- `streams.controller.ts` の SSE ハンドラで minutes イベントを購読し、接続直後に `lastLive` を送る処理を追加する。
 
 ### 1) 前処理（純関数）
 
@@ -118,19 +140,21 @@ SMALL_MODEL_TIMEOUT_MS=4000
 
 - 会議 ID ごとの状態：`{ lastDigestHash, lastLive: LiveMinutes, lastEmitAt }`
 - **差分＆レート**：`lastDigestHash` が同じ、または `EMIT_INTERVAL_SEC` 未満なら送らない
-- **TTL**：`STATE_TTL_MIN` で自動破棄
+- **同時実行ガード**：会議ごとに LLM 呼び出しは直列化 (`inFlight` フラグやジョブキュー) し、重複発火を避ける。
+- **TTL**：`STATE_TTL_MIN` で自動破棄（`setTimeout` を張り直し、破棄時に minutesEmitter も閉じる）
 
 ### 4) SSE エンドポイント
 
-- `GET /minutes/live?meetingId=...`
+- 既存の `recordingSse`（`services/src/controllers/streams.controller.ts`）に minutes 配信を組み込む。
+  - 接続時：minutes サービスから `lastLive`（あれば）を取得して即送信。
+  - 更新時：`event: "minutes.partial"\ndata: { ... }` を `stream.write` で送る。
+  - keep-alive：既存の `ping` コメント/イベントを流用（追加は不要）。
+  - 切断時は minutes サービス側の購読解除（`off`）を忘れない。
 
-  - 接続時：`lastLive` があれば即 1 回送信
-  - 以降：更新時に `event: "minutes.partial"` を送信
-  - 15〜30 秒に一度 `:heartbeat\n\n` を送って接続維持
+### 5) 初期化と購読
 
-### 5) 既存 WS との接続
-
-- 既存の WS 受信ハンドラから `onTranscript(chunk: TranscriptChunk)` を呼べる Adapter を 1 つ用意
+- minutes サービスはモジュール初期化時に `transcriptEmitter.on("transcript", ...)` で購読し、`STATE_TTL_MIN` 経過後に自動破棄されるようタイマー管理を行う。
+- `services/src/index.ts` から明示的に import して初期化漏れを防ぐ（tree-shaking で落ちないよう、副作用 import も検討）。
 
 ---
 
@@ -142,7 +166,7 @@ SMALL_MODEL_TIMEOUT_MS=4000
 {
   "type": "object",
   "properties": {
-    "summary": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 5 },
+    "summary": { "type": "array", "items": { "type": "string" }, "minItems": 3, "maxItems": 5 },
     "actions": {
       "type": "array",
       "items": {
@@ -189,26 +213,44 @@ SMALL_MODEL_TIMEOUT_MS=4000
 ## 疑似コード（最小）
 
 ```ts
-function onTranscript(chunk: TranscriptChunk) {
-  state.ingest(chunk); // confidence/結合/窓抽出まで
-  const digest = state.buildDigest(chunk.meetingId);
+transcriptEmitter.on("transcript", async (chunk: TranscriptChunk) => {
+  minutesState.ingest(chunk); // confidence/結合/窓抽出まで
+  const digest = minutesState.buildDigest(chunk.meetingId);
   const now = Date.now();
+
   if (!digest || digest.length < 40) return;
-  if (state.lastHash === hash(digest)) return;
-  if (now - state.lastEmitAt < EMIT_INTERVAL_SEC * 1000) return;
+  const digestHash = hash(digest);
+  const prev = minutesState.get(chunk.meetingId);
+  if (prev && prev.lastHash === digestHash) return;
+  if (prev && now - prev.lastEmitAt < EMIT_INTERVAL_SEC * 1000) return;
 
   let live: LiveMinutes | null = null;
   try {
-    live = await smallLLM.summarizeToJSON(digest); // 常時ON
-  } catch {
-    // 1回だけ再試行（プロバイダ障害吸収）
     live = await smallLLM.summarizeToJSON(digest);
+  } catch (err) {
+    minutesLogger.warn("summarize failed, retry once", { err });
+    try {
+      live = await smallLLM.summarizeToJSON(digest);
+    } catch (err2) {
+      minutesLogger.error("retry also failed", { err: err2 });
+      live = prev?.lastLive ?? null;
+    }
   }
-  if (!live) live = state.lastLive ?? { summary: [], actions: [] }; // 直前の正常値
 
-  state.save({ lastLive: live, lastHash: hash(digest), lastEmitAt: now });
-  sse.emit("minutes.partial", live);
-}
+  if (!live) return; // 無音より直前値再送が無い場合はここで終了
+
+  minutesState.save(chunk.meetingId, {
+    lastLive: live,
+    lastHash: digestHash,
+    lastEmitAt: now,
+  });
+
+  liveMinutesEmitter.emit("minutes", {
+    meetingId: chunk.meetingId,
+    live,
+    emittedAt: now,
+  });
+});
 ```
 
 ---
@@ -217,7 +259,8 @@ function onTranscript(chunk: TranscriptChunk) {
 
 - **前処理ユニット**：低 confidence やノイズ断片が捨てられ、結合・窓抽出が正しく行われること。
 - **スキーマ検証**：`smallLLM.summarizeToJSON` の戻り値が **JSON Schema に通る**こと（LLM は実呼び出し。失敗しがちな環境では `it.skip` 可）。
-- **SSE 疑似**：疑似断片を連投しても**差分＆間隔**が効き、連投しないこと。
+- **SSE 疑似**：疑似断片を minutes サービスに流し込み、`types=minutes` で接続したクライアントに `minutes.partial` が届く / `ping` は継続し、差分＆レート制御が効いていること。
+- **TTL 動作（オプション）**：`STATE_TTL_MIN` 経過後に状態が破棄され、新しい transcript で再初期化されること。
 
 > どうしても CI で LLM を叩きたくない場合のみ、\*\*固定 JSON を返す“軽量スタブ”\*\*に切替可能にしておいてください（本番コードは常に LLM を叩く）。
 
@@ -233,8 +276,8 @@ function onTranscript(chunk: TranscriptChunk) {
 要件:
 - LLMは常時ON（OFFはなし）。JSON Schema厳守、崩れたら1回だけ再試行、ダメなら直前の正常値を再送。
 - 差分＆レート制御で連投しない。メモリのみ。STATE_TTL_MINで破棄。
-- SSE: GET /minutes/live?meetingId=... / event: minutes.partial
-- 既存WSから onTranscript(chunk) を呼べば流れる。
+- SSE: GET /v1/meetings/:meetingId/stream?types=minutes / event: minutes.partial
+- ws-relay の `transcriptEmitter` を購読して minutes を更新（import されれば常時起動）。
 
 提供物:
 - 実装コード一式（Node18+/TS）
