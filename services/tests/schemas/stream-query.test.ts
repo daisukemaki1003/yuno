@@ -1,5 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
-import { StreamQuerySchema } from "@/schemas/http.v1.js";
+import { StreamQuerySchema } from "../../src/schemas/http.v1.js";
 
 // minutes イベント追加に伴う types パラメータの挙動を検証
 describe("StreamQuerySchema", () => {
@@ -9,11 +9,7 @@ describe("StreamQuerySchema", () => {
       mode: "raw",
     });
 
-    expect(Array.from(result.types)).toEqual([
-      "audio",
-      "transcript",
-      "event",
-    ]);
+    expect(Array.from(result.types)).toEqual(["audio", "transcript", "event"]);
   });
 
   it("should accept minutes when explicitly requested", () => {
