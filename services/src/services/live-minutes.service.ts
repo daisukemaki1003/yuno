@@ -382,7 +382,7 @@ function normalizeLiveMinutes(jsonText: string): LiveMinutes {
   let raw: unknown;
   try {
     raw = JSON.parse(jsonText);
-  } catch (error) {
+  } catch {
     throw new Error(`Failed to parse Gemini JSON: ${jsonText}`);
   }
 
@@ -402,8 +402,12 @@ function normalizeLiveMinutes(jsonText: string): LiveMinutes {
     .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
     .map((item) => {
       const text = typeof item.text === "string" ? item.text.trim() : "";
-      const owner = typeof item.owner === "string" && item.owner.trim().length > 0 ? item.owner.trim() : undefined;
-      const due = typeof item.due === "string" && item.due.trim().length > 0 ? item.due.trim() : undefined;
+      const owner =
+        typeof item.owner === "string" && item.owner.trim().length > 0
+          ? item.owner.trim()
+          : undefined;
+      const due =
+        typeof item.due === "string" && item.due.trim().length > 0 ? item.due.trim() : undefined;
       return { text, owner, due };
     })
     .filter((item) => item.text.length > 0)
