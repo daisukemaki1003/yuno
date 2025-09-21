@@ -17,7 +17,7 @@
 - `StreamQuerySchema` の `types` には現在 `audio, transcript, event` のみが許可されており、新しい種別 `minutes` を追加する必要がある。
 - `transcriptEmitter` から流れてくるデータには `confidence` が含まれていないため、前処理で信頼度フィルタを掛けるには `ws-relay.service.ts` 側で値を引き渡す修正が必要。
 - KEEP-ALIVE は `: ping` コメントと `event: ping`（20 秒間隔）で既に実装されているので、新しいイベントもこれに合わせる。
-- LLM 実装は未着手。Gemini 利用に合わせて `@google/genai` を導入し、API キーのみ環境変数（`GOOGLE_GENAI_API_KEY`）で扱う。
+- LLM 実装は未着手。Gemini 利用に合わせて Firebase AI SDK (`firebase/ai`) を導入し、API キーのみ環境変数（`GOOGLE_GENAI_API_KEY`）で扱う。
 
 ## 成果物（受け入れ基準 / DoD）
 
@@ -116,7 +116,7 @@ export type LiveMinutes = {
 - `StreamTypeSchema` / `StreamQuerySchema` に `minutes` 種別を追加。`types` 指定が無い場合は互換性のため従来どおり `audio,transcript,event` を返す。
 - `services/src/services` に minutes 専用サービスを用意し、`transcriptEmitter` を購読して minutes 更新を発火する `EventEmitter`（例: `liveMinutesEmitter`）と現在の `lastLive` を取得する API を提供する。
 - `streams.controller.ts` の SSE ハンドラで minutes イベントを購読し、接続直後に `lastLive` を送る処理を追加する。
-- `@google/genai` を `services` パッケージに追加（`pnpm add -w @google/genai` など）。型ファイルが必要なら `@types/node-fetch` 等も検討。
+- Firebase AI SDK (`firebase/ai`) を `services` パッケージに追加し、Gemini 呼び出しは同 SDK 経由で行う。
 - `services/src/configs/env.ts` には `GOOGLE_GENAI_API_KEY` のみ追加し、その他の Gemini 関連値はコード内定数で扱う。
 
 ### 1) 前処理（純関数）
@@ -127,34 +127,69 @@ export type LiveMinutes = {
 - **窓抽出**：`WINDOW_SEC` 以内の発話を連結 → **digest（最大\~450 字）**
 - **重複抑制**：文面の簡易ハッシュで重複行を弾く
 
-### 2) 軽量 LLM サマライザ（常時 ON）
-
+-### 2) 軽量 LLM サマライザ（常時 ON）
+-
 - 入力：`digest`（直近 45 秒の要約テキスト）
 - 出力：`LiveMinutes`（`summary[3..5]`, `actions[0..3]`）※**JSON Schema で厳密検証**
 - **再試行**：JSON 崩壊/タイムアウト時は**同じプロンプトで 1 回だけ再試行**。失敗時は**前回正常出力を再送**。
 - **呼ぶ条件**：`digest.length >= 40` かつ **前回 digest から十分変化**（単純ハッシュ不一致で OK）
-- 実装：`@google/genai` の `GoogleGenAI` クライアントを常駐させ、`models.generateContent` を利用。`responseSchema` と `outputMimeType: "application/json"` を指定し、戻り値（JSON 文字列）を `JSON.parse` して `LiveMinutes` に変換する。
-- Safety ブロックなどで `response.text` が空になるケースに備え、`response.candidates?.[0]?.content?.parts?.[0]?.text` をフォールバック参照し、空ならリトライ扱いにする。
+- 実装：Firebase AI SDK (`firebase/ai`) を用い、`getAI` + `GoogleAIBackend` で Gemini バックエンドを初期化。`responseMimeType: "application/json"` と `responseSchema` を必ず指定し、戻り値（JSON 文字列）を `JSON.parse` して `LiveMinutes` に変換する。
+- Safety ブロックなどで `result.response.text()` が空になるケースに備え、`result.response.candidates?.[0]?.content?.parts?.[0]?.text` をフォールバック参照し、空ならリトライ扱いにする。
 - 例：
-  ```ts
-  import { GoogleGenAI } from "@google/genai";
-
-  const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENAI_API_KEY! });
-  const response = await ai.models.generateContent({
-    model: DEFAULT_GEMINI_MODEL,
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    config: {
-      temperature: TEMPERATURE,
-      maxOutputTokens: MAX_TOKENS,
-      responseMimeType: "application/json",
-      responseSchema: liveMinutesJsonSchema,
-    },
-  });
-
-  const live = JSON.parse(response.text) as LiveMinutes;
+-  ```ts
+-  import { initializeApp } from "firebase/app";
+-  import {
+-    getAI,
+-    getGenerativeModel,
+-    GoogleAIBackend,
+-    Schema,
+-  } from "firebase/ai";
+-
+-  const firebaseApp = initializeApp(firebaseConfig); // 既存の PROJECT_ID など最小構成でOK
+-  const ai = getAI(firebaseApp, {
+-    backend: new GoogleAIBackend({ apiKey: process.env.GOOGLE_GENAI_API_KEY! }),
+-  });
+-
+-  const liveMinutesSchema = Schema.object({
+-    properties: {
+-      summary: Schema.array({
+-        items: Schema.string(),
+-        minItems: 3,
+-        maxItems: 5,
+-      }),
+-      actions: Schema.array({
+-        items: Schema.object({
+-          properties: {
+-            text: Schema.string(),
+-            owner: Schema.string(),
+-            due: Schema.string(),
+-          },
+-          optionalProperties: ["owner", "due"],
+-        }),
+-        maxItems: 3,
+-      }),
+-    },
+-    requiredProperties: ["summary", "actions"],
+-  });
+-
+-  const model = getGenerativeModel(ai, {
+-    model: DEFAULT_GEMINI_MODEL,
+-    generationConfig: {
+-      responseMimeType: "application/json",
+-      responseSchema: liveMinutesSchema,
+-      temperature: TEMPERATURE,
+-      maxOutputTokens: MAX_TOKENS,
+-    },
+-  });
+-
+-  const result = await model.generateContent(prompt);
+-  const jsonText = result.response.text()
+-    ?? result.response.candidates?.[0]?.content?.parts?.[0]?.text;
+-  if (!jsonText) throw new Error("Gemini response missing JSON payload");
+-  const live = JSON.parse(jsonText) as LiveMinutes;
   ```
 - 上記の `DEFAULT_GEMINI_MODEL` / `TEMPERATURE` / `MAX_TOKENS` は `live-minutes.config.ts` などの共有モジュールから import する想定。
-- `config.responseSchema` では `owner/due` の optional を含む JSON Schema を指定（`@google/genai` の仕様上 Draft 2020-12 準拠）。
+- `generationConfig.responseSchema` では `owner/due` の optional を含む JSON Schema を指定（Firebase AI SDK は Draft 2020-12 準拠）。
 
 ### 3) 状態と送出制御
 
@@ -226,7 +261,7 @@ export type LiveMinutes = {
 出力は JSON のみ（summary と actions）。規定のスキーマに完全一致させてください。
 ```
 
-> **Gemini 利用時**：`config.responseSchema` と `responseMimeType: "application/json"` を必ず指定し、`response.text` を JSON.parse する。JSON 崩壊時はリトライ＆前回値を返す。
+> **Gemini 利用時**：`generationConfig.responseSchema` と `responseMimeType: "application/json"` を必ず指定し、`response.text()` を JSON.parse する。JSON 崩壊時はリトライ＆前回値を返す。
 
 ---
 
