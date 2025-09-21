@@ -17,6 +17,7 @@
 - `StreamQuerySchema` の `types` には現在 `audio, transcript, event` のみが許可されており、新しい種別 `minutes` を追加する必要がある。
 - `transcriptEmitter` から流れてくるデータには `confidence` が含まれていないため、前処理で信頼度フィルタを掛けるには `ws-relay.service.ts` 側で値を引き渡す修正が必要。
 - KEEP-ALIVE は `: ping` コメントと `event: ping`（20 秒間隔）で既に実装されているので、新しいイベントもこれに合わせる。
+- LLM 実装は未着手。Gemini 利用に合わせて `@google/genai` を導入し、API キーのみ環境変数（`GOOGLE_GENAI_API_KEY`）で扱う。
 
 ## 成果物（受け入れ基準 / DoD）
 
@@ -88,27 +89,22 @@ export type LiveMinutes = {
 
 ---
 
-## 設定（環境変数・値は調整可）
+## 設定（コード内定数で管理）
 
-```
-# 前処理
-CONF_MIN=0.55           # これ未満の信頼度は捨てる
-MERGE_GAP_MS=1200       # 断片結合の最大ギャップ(ms)
-WINDOW_SEC=45           # 直近ウィンドウ(秒)
-EMIT_INTERVAL_SEC=10    # 最短送出間隔(秒)
-MAX_SUMMARY=5
-MAX_ACTIONS=3
-STATE_TTL_MIN=30        # 最終入力からの破棄(分)
-
-# LLM（軽量・常時ON）
-SMALL_MODEL_PROVIDER=openai     # openai|anthropic|azure など
-SMALL_MODEL_NAME=gpt-4o-mini    # 例
-SMALL_MODEL_MAX_TOKENS=320
-SMALL_MODEL_TEMP=0.2
-SMALL_MODEL_TIMEOUT_MS=4000
-```
-
-> ※ `services/src/configs/env.ts` と `services/docs/reference/environment.md` への追記を忘れずに（`zod` バリデーション含む）。
+- 前処理パラメータはモジュール定数（例：`services/src/services/live-minutes.config.ts`）として管理。デフォルト値：
+  - `CONF_MIN=0.55`
+  - `MERGE_GAP_MS=1200`
+  - `WINDOW_SEC=45`
+  - `EMIT_INTERVAL_SEC=10`
+  - `MAX_SUMMARY=5`
+  - `MAX_ACTIONS=3`
+  - `STATE_TTL_MIN=30`
+- LLM も同モジュールで固定値を定義する。
+  - `DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"`
+  - `MAX_TOKENS = 320`
+  - `TEMPERATURE = 0.2`
+  - `REQUEST_TIMEOUT_MS = 4000`
+- 環境変数は Gemini の API キーのみ (`GOOGLE_GENAI_API_KEY`)。その他はコード内で定数として扱い、変更が必要な場合のみ設定ファイルで上書きする。
 
 ---
 
@@ -120,6 +116,8 @@ SMALL_MODEL_TIMEOUT_MS=4000
 - `StreamTypeSchema` / `StreamQuerySchema` に `minutes` 種別を追加。`types` 指定が無い場合は互換性のため従来どおり `audio,transcript,event` を返す。
 - `services/src/services` に minutes 専用サービスを用意し、`transcriptEmitter` を購読して minutes 更新を発火する `EventEmitter`（例: `liveMinutesEmitter`）と現在の `lastLive` を取得する API を提供する。
 - `streams.controller.ts` の SSE ハンドラで minutes イベントを購読し、接続直後に `lastLive` を送る処理を追加する。
+- `@google/genai` を `services` パッケージに追加（`pnpm add -w @google/genai` など）。型ファイルが必要なら `@types/node-fetch` 等も検討。
+- `services/src/configs/env.ts` には `GOOGLE_GENAI_API_KEY` のみ追加し、その他の Gemini 関連値はコード内定数で扱う。
 
 ### 1) 前処理（純関数）
 
@@ -135,6 +133,28 @@ SMALL_MODEL_TIMEOUT_MS=4000
 - 出力：`LiveMinutes`（`summary[3..5]`, `actions[0..3]`）※**JSON Schema で厳密検証**
 - **再試行**：JSON 崩壊/タイムアウト時は**同じプロンプトで 1 回だけ再試行**。失敗時は**前回正常出力を再送**。
 - **呼ぶ条件**：`digest.length >= 40` かつ **前回 digest から十分変化**（単純ハッシュ不一致で OK）
+- 実装：`@google/genai` の `GoogleGenAI` クライアントを常駐させ、`models.generateContent` を利用。`responseSchema` と `outputMimeType: "application/json"` を指定し、戻り値（JSON 文字列）を `JSON.parse` して `LiveMinutes` に変換する。
+- Safety ブロックなどで `response.text` が空になるケースに備え、`response.candidates?.[0]?.content?.parts?.[0]?.text` をフォールバック参照し、空ならリトライ扱いにする。
+- 例：
+  ```ts
+  import { GoogleGenAI } from "@google/genai";
+
+  const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENAI_API_KEY! });
+  const response = await ai.models.generateContent({
+    model: DEFAULT_GEMINI_MODEL,
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    config: {
+      temperature: TEMPERATURE,
+      maxOutputTokens: MAX_TOKENS,
+      responseMimeType: "application/json",
+      responseSchema: liveMinutesJsonSchema,
+    },
+  });
+
+  const live = JSON.parse(response.text) as LiveMinutes;
+  ```
+- 上記の `DEFAULT_GEMINI_MODEL` / `TEMPERATURE` / `MAX_TOKENS` は `live-minutes.config.ts` などの共有モジュールから import する想定。
+- `config.responseSchema` では `owner/due` の optional を含む JSON Schema を指定（`@google/genai` の仕様上 Draft 2020-12 準拠）。
 
 ### 3) 状態と送出制御
 
@@ -206,7 +226,7 @@ SMALL_MODEL_TIMEOUT_MS=4000
 出力は JSON のみ（summary と actions）。規定のスキーマに完全一致させてください。
 ```
 
-> **OpenAI 利用時**：`response_format: { type: "json_schema", json_schema: { name:"LiveMinutes", schema: <上記> } }` を使うと堅牢です。
+> **Gemini 利用時**：`config.responseSchema` と `responseMimeType: "application/json"` を必ず指定し、`response.text` を JSON.parse する。JSON 崩壊時はリトライ＆前回値を返す。
 
 ---
 
@@ -278,19 +298,20 @@ transcriptEmitter.on("transcript", async (chunk: TranscriptChunk) => {
 - 差分＆レート制御で連投しない。メモリのみ。STATE_TTL_MINで破棄。
 - SSE: GET /v1/meetings/:meetingId/stream?types=minutes / event: minutes.partial
 - ws-relay の `transcriptEmitter` を購読して minutes を更新（import されれば常時起動）。
+- LLMは Google Gemini (`gemini-2.0-flash`) 固定。`@google/genai` を使い、`responseMimeType: "application/json"` + `responseSchema` を指定する。
 
 提供物:
 - 実装コード一式（Node18+/TS）
 - README（起動/環境変数/API）
 - テスト（前処理/スキーマ/SSE差分）※ LLM実呼び出しが難しければ該当テストは it.skip でOK
 
-環境変数（初期値は任意変更可）:
-CONF_MIN=0.55 MERGE_GAP_MS=1200 WINDOW_SEC=45 EMIT_INTERVAL_SEC=10 MAX_SUMMARY=5 MAX_ACTIONS=3 STATE_TTL_MIN=30
-SMALL_MODEL_PROVIDER=openai SMALL_MODEL_NAME=gpt-4o-mini SMALL_MODEL_MAX_TOKENS=320 SMALL_MODEL_TEMP=0.2 SMALL_MODEL_TIMEOUT_MS=4000
+環境変数:
+GOOGLE_GENAI_API_KEY=<set>
 
 備考:
 - ディレクトリ構成は任意。I/F（型・API・関数名）は維持してください。
 - LLMプロンプトとJSON Schemaは添付テンプレに従ってください。
+- `services/src/configs/env.ts` に `GOOGLE_GENAI_API_KEY` 等を追加し、環境変数ドキュメントも更新してください。
 ```
 
 ---
