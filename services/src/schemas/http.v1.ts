@@ -46,15 +46,31 @@ export const StreamParamsSchema = z.object({
 });
 
 export const StreamModeSchema = z.enum(['raw', 'normalized']).default('raw');
-export const StreamTypeSchema = z.enum(['audio', 'transcript', 'event']);
+
+// SSE で購読できるイベント種別を minutes 対応込みで定義
+const STREAM_TYPES = ['audio', 'transcript', 'event', 'minutes'] as const;
+const DEFAULT_STREAM_TYPES = ['audio', 'transcript', 'event'] as const;
+
+export const StreamTypeSchema = z.enum(STREAM_TYPES);
 
 export const StreamQuerySchema = z.object({
   userId: UserIdSchema,
   mode: StreamModeSchema,
   types: z.string().optional().transform((val) => {
-    if (!val) return new Set<string>(['audio', 'transcript', 'event']);
-    const types = val.split(',').map(t => t.trim()).filter(Boolean);
-    return new Set(types);
+    if (!val) {
+      return new Set<string>(DEFAULT_STREAM_TYPES);
+    }
+
+    const requested = val
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => STREAM_TYPES.includes(t as (typeof STREAM_TYPES)[number]));
+
+    if (requested.length === 0) {
+      return new Set<string>(DEFAULT_STREAM_TYPES);
+    }
+
+    return new Set(requested);
   }),
 });
 

@@ -34,6 +34,8 @@ const envSchema = z.object({
   // Gladia configuration (required for WebSocket relay)
   GLADIA_API_KEY: z.string().min(1, 'GLADIA_API_KEY is required'),
   PUBLIC_WS_BASE: z.string().min(1, 'PUBLIC_WS_BASE is required'),
+  // Gemini(Google AI) を叩くための API キー
+  GOOGLE_GENAI_API_KEY: z.string().min(1, 'GOOGLE_GENAI_API_KEY is required'),
   
   // WebSocket relay configuration
   STREAM_RECONNECT_BASE_MS: z

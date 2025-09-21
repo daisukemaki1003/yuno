@@ -273,13 +273,14 @@ function handleGladiaMessage(session: RelaySession, data: WebSocket.Data) {
         timestamp: new Date().toISOString()
       });
 
-      // Emit transcript event for SSE relay with normalized schema
+      // minutes サービスでも利用できるよう confidence を含めて通知
       transcriptEmitter.emit("transcript", {
         meetingId: session.meetingId,
         type: "transcript",
         isFinal,
         text: text || "",
         language: language || "unknown",
+        confidence,
         timestamp: new Date().toISOString(),
       });
     } else if (message.type === "error") {

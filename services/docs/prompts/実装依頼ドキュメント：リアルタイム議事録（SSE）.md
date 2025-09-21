@@ -127,67 +127,70 @@ export type LiveMinutes = {
 - **窓抽出**：`WINDOW_SEC` 以内の発話を連結 → **digest（最大\~450 字）**
 - **重複抑制**：文面の簡易ハッシュで重複行を弾く
 
--### 2) 軽量 LLM サマライザ（常時 ON）
--
+## -### 2) 軽量 LLM サマライザ（常時 ON）
+
 - 入力：`digest`（直近 45 秒の要約テキスト）
 - 出力：`LiveMinutes`（`summary[3..5]`, `actions[0..3]`）※**JSON Schema で厳密検証**
 - **再試行**：JSON 崩壊/タイムアウト時は**同じプロンプトで 1 回だけ再試行**。失敗時は**前回正常出力を再送**。
 - **呼ぶ条件**：`digest.length >= 40` かつ **前回 digest から十分変化**（単純ハッシュ不一致で OK）
 - 実装：Firebase AI SDK (`firebase/ai`) を用い、`getAI` + `GoogleAIBackend` で Gemini バックエンドを初期化。`responseMimeType: "application/json"` と `responseSchema` を必ず指定し、戻り値（JSON 文字列）を `JSON.parse` して `LiveMinutes` に変換する。
 - Safety ブロックなどで `result.response.text()` が空になるケースに備え、`result.response.candidates?.[0]?.content?.parts?.[0]?.text` をフォールバック参照し、空ならリトライ扱いにする。
-- 例：
--  ```ts
--  import { initializeApp } from "firebase/app";
--  import {
--    getAI,
--    getGenerativeModel,
--    GoogleAIBackend,
--    Schema,
--  } from "firebase/ai";
+
+例：
+
+```ts
+import { initializeApp } from "firebase/app";
+import {
+  getAI,
+  getGenerativeModel,
+  GoogleAIBackend,
+  Schema,
+} from "firebase/ai";
 -
--  const firebaseApp = initializeApp(firebaseConfig); // 既存の PROJECT_ID など最小構成でOK
--  const ai = getAI(firebaseApp, {
--    backend: new GoogleAIBackend({ apiKey: process.env.GOOGLE_GENAI_API_KEY! }),
--  });
--
--  const liveMinutesSchema = Schema.object({
--    properties: {
--      summary: Schema.array({
--        items: Schema.string(),
--        minItems: 3,
--        maxItems: 5,
--      }),
--      actions: Schema.array({
--        items: Schema.object({
--          properties: {
--            text: Schema.string(),
--            owner: Schema.string(),
--            due: Schema.string(),
--          },
--          optionalProperties: ["owner", "due"],
--        }),
--        maxItems: 3,
--      }),
--    },
--    requiredProperties: ["summary", "actions"],
--  });
--
--  const model = getGenerativeModel(ai, {
--    model: DEFAULT_GEMINI_MODEL,
--    generationConfig: {
--      responseMimeType: "application/json",
--      responseSchema: liveMinutesSchema,
--      temperature: TEMPERATURE,
--      maxOutputTokens: MAX_TOKENS,
--    },
--  });
--
--  const result = await model.generateContent(prompt);
--  const jsonText = result.response.text()
--    ?? result.response.candidates?.[0]?.content?.parts?.[0]?.text;
--  if (!jsonText) throw new Error("Gemini response missing JSON payload");
--  const live = JSON.parse(jsonText) as LiveMinutes;
-  ```
+const firebaseApp = initializeApp(firebaseConfig); // 既存の PROJECT_ID など最小構成でOK
+const ai = getAI(firebaseApp, {
+  backend: new GoogleAIBackend({ apiKey: process.env.GOOGLE_GENAI_API_KEY! }),
+});
+
+const liveMinutesSchema = Schema.object({
+  properties: {
+    summary: Schema.array({
+      items: Schema.string(),
+      minItems: 3,
+      maxItems: 5,
+    }),
+    actions: Schema.array({
+      items: Schema.object({
+        properties: {
+          text: Schema.string(),
+          owner: Schema.string(),
+          due: Schema.string(),
+        },
+        optionalProperties: ["owner", "due"],
+      }),
+      maxItems: 3,
+    }),
+  },
+  requiredProperties: ["summary", "actions"],
+});
+
+const model = getGenerativeModel(ai, {
+  model: DEFAULT_GEMINI_MODEL,
+  generationConfig: {
+    responseMimeType: "application/json",
+    responseSchema: liveMinutesSchema,
+    temperature: TEMPERATURE,
+    maxOutputTokens: MAX_TOKENS,
+  },
+});
+
+const result = await model.generateContent(prompt);
+const jsonText = result.response.text()
+  ?? result.response.candidates?.[0]?.content?.parts?.[0]?.text;
+if (!jsonText) throw new Error("Gemini response missing JSON payload");
+const live = JSON.parse(jsonText) as LiveMinutes;
+```
+
 - 上記の `DEFAULT_GEMINI_MODEL` / `TEMPERATURE` / `MAX_TOKENS` は `live-minutes.config.ts` などの共有モジュールから import する想定。
 - `generationConfig.responseSchema` では `owner/due` の optional を含む JSON Schema を指定（Firebase AI SDK は Draft 2020-12 準拠）。
 

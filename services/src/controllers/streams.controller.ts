@@ -4,6 +4,12 @@ import { StreamParamsSchema, StreamQuerySchema } from "@/schemas/http.v1.js";
 import { badRequest } from "@/utils/errors.js";
 import type { Logger } from "@/utils/logger.js";
 import { transcriptEmitter } from "@/services/ws-relay.service.js";
+import {
+  getLastLiveMinutes,
+  onLiveMinutes,
+  offLiveMinutes,
+  type MinutesEvent,
+} from "@/services/live-minutes.service.js";
 
 /**
  * SSE recording stream handler - WebSocket relay mode only
@@ -37,6 +43,7 @@ export async function recordingSse(c: Context): Promise<Response> {
   return stream(c, async (stream) => {
     let pingInterval: NodeJS.Timeout | null = null;
     let gladiaListener: ((data: unknown) => void) | null = null;
+    let minutesListener: ((event: MinutesEvent) => void) | null = null;
 
     try {
       logger.info("Using WebSocket relay mode for streaming");
@@ -95,6 +102,29 @@ export async function recordingSse(c: Context): Promise<Response> {
       // Subscribe to Gladia transcript events
       transcriptEmitter.on("transcript", gladiaListener);
 
+      if (types.has("minutes")) {
+        // 接続直後に最新の minutes を 1 度返しておく
+        const lastLive = getLastLiveMinutes(meetingId);
+        if (lastLive) {
+          await stream.write(
+            `event: minutes.partial\ndata: ${JSON.stringify(lastLive)}\n\n`
+          );
+        }
+
+        minutesListener = (event: MinutesEvent) => {
+          if (event.meetingId !== meetingId) {
+            return;
+          }
+
+          // new minutes が生成される度に push 配信
+          void stream.write(
+            `event: minutes.partial\ndata: ${JSON.stringify(event.live)}\n\n`
+          );
+        };
+
+        onLiveMinutes(minutesListener);
+      }
+
       // Send retry directive
       await stream.write(`retry: 5000\n\n`);
 
@@ -135,6 +165,10 @@ export async function recordingSse(c: Context): Promise<Response> {
 
       if (gladiaListener) {
         transcriptEmitter.removeListener("transcript", gladiaListener);
+      }
+
+      if (minutesListener) {
+        offLiveMinutes(minutesListener);
       }
     }
   });

@@ -148,3 +148,23 @@ export async function leaveBot(c: Context): Promise<Response> {
     throw internal("UPSTREAM_ERROR", "Failed to remove bot from meeting");
   }
 }
+
+/**
+ * Placeholder for bot status endpoint (not yet supported)
+ */
+export async function getStatus(c: Context): Promise<Response> {
+  const logger = c.get("logger") as Logger;
+  const { botId } = c.req.param();
+
+  // ステータス API は未実装のため 501 を返却
+  logger.warn("Bot status endpoint not implemented", { botId });
+
+  return c.json(
+    {
+      botId,
+      status: "unknown",
+      message: "Bot status endpoint is not implemented",
+    },
+    501
+  );
+}

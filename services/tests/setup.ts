@@ -10,6 +10,7 @@ process.env.STREAM_RECONNECT_BASE_MS = '1000';
 process.env.STREAM_BACKPRESSURE_MAX_BUFFER = '1048576'; // 1MB
 process.env.PUBLIC_WS_BASE = 'wss://test.api.com';
 process.env.GLADIA_API_KEY = 'test-gladia-key';
+process.env.GOOGLE_GENAI_API_KEY = 'test-gemini-key';
 process.env.WS_RELAY_AUTH_TOKEN = 'test-auth-token';
 process.env.PROJECT_ID = 'test-project';
 process.env.REGION = 'test-region';
