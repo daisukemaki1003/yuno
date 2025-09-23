@@ -2,6 +2,7 @@ import { EventEmitter } from "events";
 import { createHash } from "crypto";
 // transcript を集約→Gemini(Google AI)で要約→SSE minutes を発火するメインサービス
 import { MINUTES_CONFIG, FILLER_WORDS, MAX_DIGEST_LENGTH } from "@/configs/minutes.config.js";
+import { MINUTES_FINAL_CONFIG } from "@/configs/minutes-final.config.js";
 import { Delta30sSchema, type Delta30s } from "@/domain/minutes/index.js";
 import { transcriptEmitter } from "@/services/ws-relay.service.js";
 import { env } from "@/configs/env.js";
@@ -58,29 +59,6 @@ const WINDOW_MS = MINUTES_CONFIG.WINDOW_SEC * 1000;
 const EMIT_INTERVAL_MS = MINUTES_CONFIG.EMIT_INTERVAL_SEC * 1000;
 const STATE_TTL_MS = MINUTES_CONFIG.STATE_TTL_MIN * 60 * 1000;
 
-const LIVE_MINUTES_RESPONSE_SCHEMA = {
-  type: "object",
-  properties: {
-    summary: {
-      type: "array",
-      items: { type: "string" },
-    },
-    actions: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          text: { type: "string" },
-          owner: { type: "string" },
-          due: { type: "string" },
-        },
-        required: ["text"],
-      },
-    },
-  },
-  required: ["summary", "actions"],
-};
-
 const DELTA_RESPONSE_SCHEMA = {
   type: "object",
   properties: {
@@ -133,8 +111,7 @@ const DELTA_RESPONSE_SCHEMA = {
   additionalProperties: false,
 };
 
-const PROMPT_TEMPLATE = `直近の会話ダイジェスト:\n----\n{DIGEST}\n----\n出力は JSON のみ（summary と actions）。規定のスキーマに完全一致させてください。`;
-const DELTA_PROMPT_TEMPLATE = `あなたは会議メモの確定版を作成するアシスタントです。直近30秒の会話ダイジェストを読み、以下の条件で JSON を出力してください。\n- summaries: 会話内の主要トピックを短い箇条書きで。1要約=1トピック、最大4件。\n- actions: 実行すべきタスク。可能であれば owner/due(YYYY-MM-DD)/confidence(0-1) を補完。\n- decisions: 明確に決まった事項があれば列挙。\n- questions: 未解決の論点や確認事項。priority は low/mid/high のいずれか。\n出力は JSON のみ。余計な説明を含めないでください。\n----\n{DIGEST}\n----`;
+const PROMPT_TEMPLATE = `あなたは会議メモの確定版を作成するアシスタントです。直近30秒の会話ダイジェストを読み、以下の条件で JSON を出力してください。\n- summaries: 会話内の主要トピックを短い箇条書きで。1要約=1トピック、最大4件。\n- actions: 実行すべきタスク。可能であれば owner/due(YYYY-MM-DD)/confidence(0-1) を補完。\n- decisions: 明確に決まった事項があれば列挙。\n- questions: 未解決の論点や確認事項。priority は low/mid/high のいずれか。\n出力は JSON のみ。余計な説明を含めないでください。\n----\n{DIGEST}\n----`;
 const MINUTES_EVENT = "minutes" as const;
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -304,7 +281,7 @@ async function processQueue(meetingId: string, state: MeetingState) {
       continue;
     }
 
-    const live = await summarizeWithRetry(candidate.digest, meetingId, state.lastLive);
+    const live = await summarizeWithRetry(candidate, meetingId, state.lastLive);
 
     if (!live) {
       if (state.lastLive) {
@@ -324,6 +301,8 @@ async function processQueue(meetingId: string, state: MeetingState) {
     minutesLogger.info("Minutes generated", {
       meetingId,
       digestLength: candidate.digest.length,
+      windowStart: candidate.queuedAt - MINUTES_FINAL_CONFIG.DELTA_WINDOW_SEC * 1000,
+      windowEnd: candidate.queuedAt,
     });
 
     state.lastLive = live;
@@ -340,20 +319,29 @@ async function processQueue(meetingId: string, state: MeetingState) {
   state.processing = false;
 }
 
-// Gemini 失敗時に 1 回だけリトライし、最終的に前回値へフォールバック
+// Gemini 失敗時に規定回数リトライし、前回値へフォールバック
 async function summarizeWithRetry(
-  digest: string,
+  candidate: DigestCandidate,
   meetingId: string,
   previous: LiveMinutes | null
 ): Promise<LiveMinutes | null> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const windowEnd = candidate.queuedAt;
+  const windowStart = windowEnd - MINUTES_FINAL_CONFIG.DELTA_WINDOW_SEC * 1000;
+
+  for (let attempt = 0; attempt <= MINUTES_FINAL_CONFIG.LLM_RETRY_LIMIT; attempt++) {
     try {
-      const live = await summarizeDigest(digest);
-      return live;
+      const delta = await generateDelta30sFromDigest(candidate.digest, {
+        meetingId,
+        windowStart,
+        windowEnd,
+      });
+      return convertDeltaToLiveMinutes(delta);
     } catch (error) {
       minutesLogger.warn("Gemini summarize failed", {
         meetingId,
         attempt,
+        windowStart,
+        windowEnd,
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -362,16 +350,9 @@ async function summarizeWithRetry(
   return previous;
 }
 
-// Gemini で JSON 出力を生成し、summary/actions をトリミング
-async function summarizeDigest(digest: string): Promise<LiveMinutes> {
-  const prompt = PROMPT_TEMPLATE.replace("{DIGEST}", digest);
-  const jsonText = await requestGeminiJson(prompt);
-  return normalizeLiveMinutes(jsonText);
-}
-
 async function requestGeminiJson(
   prompt: string,
-  responseSchema: Record<string, unknown> = LIVE_MINUTES_RESPONSE_SCHEMA
+  responseSchema: Record<string, unknown> = DELTA_RESPONSE_SCHEMA
 ): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), MINUTES_CONFIG.REQUEST_TIMEOUT_MS);
@@ -437,47 +418,6 @@ async function requestGeminiJson(
   }
 }
 
-function normalizeLiveMinutes(jsonText: string): LiveMinutes {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(jsonText);
-  } catch {
-    throw new Error(`Failed to parse Gemini JSON: ${jsonText}`);
-  }
-
-  const summaryRaw = Array.isArray((raw as Record<string, unknown>).summary)
-    ? ((raw as Record<string, unknown>).summary as unknown[])
-    : [];
-  const actionsRaw = Array.isArray((raw as Record<string, unknown>).actions)
-    ? ((raw as Record<string, unknown>).actions as unknown[])
-    : [];
-
-  const summary = summaryRaw
-    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-    .map((item) => item.trim())
-    .slice(0, MINUTES_CONFIG.MAX_SUMMARY);
-
-  const actions = actionsRaw
-    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
-    .map((item) => {
-      const text = typeof item.text === "string" ? item.text.trim() : "";
-      const owner =
-        typeof item.owner === "string" && item.owner.trim().length > 0
-          ? item.owner.trim()
-          : undefined;
-      const due =
-        typeof item.due === "string" && item.due.trim().length > 0 ? item.due.trim() : undefined;
-      return { text, owner, due };
-    })
-    .filter((item) => item.text.length > 0)
-    .slice(0, MINUTES_CONFIG.MAX_ACTIONS);
-
-  return {
-    summary,
-    actions,
-  };
-}
-
 function normalizeDelta30s(jsonText: string): Delta30s {
   let raw: unknown;
   try {
@@ -489,11 +429,36 @@ function normalizeDelta30s(jsonText: string): Delta30s {
   return Delta30sSchema.parse(raw);
 }
 
+function convertDeltaToLiveMinutes(delta: Delta30s): LiveMinutes {
+  const summary = delta.summaries
+    .filter((item) => typeof item === "string" && item.trim().length > 0)
+    .map((item) => item.trim())
+    .slice(0, MINUTES_CONFIG.MAX_SUMMARY);
+
+  const actions = delta.actions
+    .map((action) => {
+      const owner = action.owner && action.owner.trim().length > 0 ? action.owner.trim() : undefined;
+      const due = action.due && action.due.trim().length > 0 ? action.due.trim() : undefined;
+      return {
+        text: action.task.trim(),
+        owner,
+        due,
+      };
+    })
+    .filter((item) => item.text.length > 0)
+    .slice(0, MINUTES_CONFIG.MAX_ACTIONS);
+
+  return {
+    summary,
+    actions,
+  };
+}
+
 export async function generateDelta30sFromDigest(
   digest: string,
   metadata: { meetingId: string; windowStart: number; windowEnd: number }
 ): Promise<Delta30s> {
-  const prompt = DELTA_PROMPT_TEMPLATE.replace("{DIGEST}", digest);
+  const prompt = PROMPT_TEMPLATE.replace("{DIGEST}", digest);
   const jsonText = await requestGeminiJson(prompt, DELTA_RESPONSE_SCHEMA);
   const delta = normalizeDelta30s(jsonText);
   minutesLogger.debug("Delta30s generated", {
