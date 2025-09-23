@@ -18,14 +18,16 @@
 ## 小タスク一覧（検証待ちポイント付き）
 
 ### 既存機能の改修
-- [ ] **30秒サイクル化**: transcript 集約間隔・タイマーを 15秒 → 30秒 に変更し、関連定数/テストを更新。`minutes` SSE や state 管理の副作用を確認。
-  - 検証: 実運転想定で 30秒ごとに minutes.partial が出ること。
-- [ ] **設定整備**: 30秒化に伴う定数（`EMIT_INTERVAL_SEC`, バッファ TTL など）を見直し、`live-minutes` 側の設定コメントを更新。
-  - 検証: 設定値が 30秒前提で矛盾しないこと、ドキュメント整合。
+- [x] **30秒サイクル化**: transcript 集約間隔・タイマーを 15秒 → 30秒 に変更し、関連定数/テストを更新。`minutes` SSE や state 管理の副作用を確認。
+  - 実装: `services/src/configs/minutes.config.ts` の `WINDOW_SEC`/`EMIT_INTERVAL_SEC` を更新。
+  - 検証: 実運転想定で 30秒ごとに minutes.partial が出ること（実接続での追試待ち）。
+- [x] **設定整備**: 30秒化に伴う定数（`EMIT_INTERVAL_SEC`, バッファ TTL など）を見直し、`live-minutes` 側の設定コメントを更新。
+  - ドキュメント整合: ランブックと実装依頼書を 30秒前提へ更新済み。
 
 ### 新規機能の実装
-- [ ] **ドメイン型 / スキーマ定義**: `Delta30s`, `Action`, `Decision`, `Question`, `CurrentSectionList`, `SectionUpdateResponse` を TypeScript + Zod で定義し、`services/src/domain/minutes`（新設）に配置。
-  - 検証: 型・スキーマが仕様書と一致し、テスト通過。
+- [x] **ドメイン型 / スキーマ定義**: `Delta30s`, `Action`, `Decision`, `Question`, `CurrentSectionList`, `SectionUpdateResponse` を TypeScript + Zod で定義し、`services/src/domain/minutes`（新設）に配置。
+  - 実装: `services/src/domain/minutes/index.ts`
+  - 検証: `pnpm test -- minutes.schema`
 - [ ] **設定ファイル雛形**: 30秒窓やしきい値を管理する `services/src/config/minutes-final.config.ts` を追加し、調整可能な値に TODO コメントを付与。
   - 検証: 新設定が既存コードと競合しないこと。
 - [ ] **Delta30s 生成サービス**: transcript (`TranscriptChunk`) を 30秒窓で集計し、summaries/actions/decisions/questions を構築するサービスを実装。LLM or ルール処理は抽象化し、JSON Schema に準拠。
