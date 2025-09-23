@@ -4,7 +4,7 @@
 
 ## 目的 / スコープ
 
-* **目的**：会議中の文字起こし（JSONL断片）から、**10秒目安**で「いまの議事録」を**SSE**で配信する。
+* **目的**：会議中の文字起こし（JSONL断片）から、**30秒目安**で「いまの議事録」を**SSE**で配信する。
 * **前提**：**軽量LLMを常時使用**して要点・文面整形を行う（OFFは無し）。
 * **除外**：確定版の最終議事録、確認カード、DB保存、RAG、UI。
 
@@ -21,7 +21,7 @@
 
 ## 成果物（受け入れ基準 / DoD）
 
-- 文字起こしを投入すると、**最大 15 秒以内**に `minutes.partial` が 1 回以上届く。
+- 文字起こしを投入すると、**最大 30 秒以内**に `minutes.partial` が 1 回以上届く。
 - 既存 SSE (`GET /v1/meetings/:meetingId/stream`) に `types` で `minutes` を指定し、Authorization / `x-meeting-baas-api-key` を付けると `event: minutes.partial` が受け取れる。
 - SSE ペイロードは **日本語の箇条書き 3〜5 行**の `summary` と **0〜3 件**の `actions`。
 - LLM 応答は**JSON Schema に適合**。崩れた場合は**1 回だけ自動再試行**し、それでも無理なら**直前の正常出力を再送**（黙るより安全）。
@@ -94,8 +94,8 @@ export type LiveMinutes = {
 - 前処理パラメータはモジュール定数（例：`services/src/services/live-minutes.config.ts`）として管理。デフォルト値：
   - `CONF_MIN=0.55`
   - `MERGE_GAP_MS=1200`
-  - `WINDOW_SEC=45`
-  - `EMIT_INTERVAL_SEC=10`
+  - `WINDOW_SEC=90`
+  - `EMIT_INTERVAL_SEC=30`
   - `MAX_SUMMARY=5`
   - `MAX_ACTIONS=3`
   - `STATE_TTL_MIN=30`
@@ -129,7 +129,7 @@ export type LiveMinutes = {
 
 ## -### 2) 軽量 LLM サマライザ（常時 ON）
 
-- 入力：`digest`（直近 45 秒の要約テキスト）
+- 入力：`digest`（直近 90 秒の要約テキスト）
 - 出力：`LiveMinutes`（`summary[3..5]`, `actions[0..3]`）※**JSON Schema で厳密検証**
 - **再試行**：JSON 崩壊/タイムアウト時は**同じプロンプトで 1 回だけ再試行**。失敗時は**前回正常出力を再送**。
 - **呼ぶ条件**：`digest.length >= 40` かつ **前回 digest から十分変化**（単純ハッシュ不一致で OK）
@@ -329,7 +329,7 @@ transcriptEmitter.on("transcript", async (chunk: TranscriptChunk) => {
 ```
 # 実装依頼: リアルタイム議事録（SSE）軽量LLM常時ON
 
-目的: 文字起こし(JSONL)から直近45秒のダイジェストを作り、軽量LLMで「summary(3–5) / actions(0–3)」をJSON生成し、10秒目安で SSE 配信する。
+目的: 文字起こし(JSONL)から直近90秒のダイジェストを作り、軽量LLMで「summary(3–5) / actions(0–3)」をJSON生成し、30秒目安で SSE 配信する。
 
 要件:
 - LLMは常時ON（OFFはなし）。JSON Schema厳守、崩れたら1回だけ再試行、ダメなら直前の正常値を再送。

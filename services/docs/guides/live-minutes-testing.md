@@ -27,6 +27,8 @@ Meeting BaaS (WebSocket) -> ws-relay.service (Gladia 中継) -> transcriptEmitte
                                      live-minutes.service (Gemini)
                                               ↓
                            /v1/meetings/:meetingId/stream (SSE)
+
+minutes.partial は 30 秒サイクルを目安に配信されます。無音状態が続くとスキップされる点に注意してください。
 ```
 
 ---
@@ -121,7 +123,7 @@ curl -X POST \
 | meetingId が一致しているか | `/mb-input` 接続時と SSE リクエストで同じ文字列を使っているか。URL を meetingId にする場合は SSE 側で URL エンコードする必要があります。 |
 | transcript が届いているか | `services/logs/transcripts-*.jsonl` やコンソールログ（`📝 Transcript`）で `isFinal: true` / `language: "ja"` の行があるか確認。 |
 | confidence が 0.55 以上か | 低すぎる transcript は minutes の対象外になります。必要であれば `services/src/configs/minutes.config.ts` の `CONF_MIN` を調整してください。 |
-| digest が作られているか | 45 秒以内に合計 40 文字以上の transcript がないと LLM を呼びません。任意のテキストを emit してテストすると切り分けが容易です。 |
+| digest が作られているか | 90 秒以内に合計 40 文字以上の transcript がないと LLM を呼びません。任意のテキストを emit してテストすると切り分けが容易です。 |
 | Gemini エラーが出ていないか | `pnpm dev` のターミナルに `Gemini summarize failed` が表示されていないか確認。API キーやレスポンスの JSON 化エラーが原因の場合があります。 |
 
 開発サーバーでは `Transcript accepted` / `Digest candidate queued` / `Minutes generated` などの info ログが出力されます。これらが出ていない場合は上記チェックリストを参照してください。
