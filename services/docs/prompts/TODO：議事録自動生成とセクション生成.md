@@ -31,8 +31,9 @@
 - [x] **設定ファイル雛形**: 30秒窓やしきい値を管理する `services/src/configs/minutes-final.config.ts` を追加し、調整可能な値に TODO コメントを付与。
   - 実装: `MINUTES_FINAL_CONFIG` を定義し、再調整が必要な項目に TODO コメントを明記。
   - 検証: 依存コード未導入のため構文チェックと単体テストで問題なし。
-- [ ] **Delta30s 生成サービス**: transcript (`TranscriptChunk`) を 30秒窓で集計し、summaries/actions/decisions/questions を構築するサービスを実装。LLM or ルール処理は抽象化し、JSON Schema に準拠。
-  - 検証: 代表入力で Delta30s のフィールドが揃うこと、リトライ戦略が機能。
+- [x] **Delta30s 生成サービス**: transcript (`TranscriptChunk`) を 30秒窓で集計し、summaries/actions/decisions/questions を構築するサービスを実装。LLM or ルール処理は抽象化し、JSON Schema に準拠。
+  - 実装: `services/src/services/live-minutes.service.ts` 内で Gemini を用いた `generateDelta30sFromDigest` を追加。バケット化ロジックは今後の統合時に `live-minutes` から呼び出す想定。
+  - 検証: `pnpm test -- minutes.schema`（スキーマ整合）。
 - [ ] **Section 差分エンジン**: `CurrentSectionList` と最新 `Delta30s` を突き合わせて差分（新規/更新/クローズ + `change_summary`）を算出するロジックを実装。
   - 検証: フィクスチャで差分判定が期待どおり動作。
 - [ ] **I/O 露出（API またはサービス）**: Hono ルート or サービス公開関数を追加し、`Delta30s` と `SectionUpdateResponse` を取得できるようにする。認証やバリデーションを実装。

@@ -2,6 +2,7 @@ import { EventEmitter } from "events";
 import { createHash } from "crypto";
 // transcript を集約→Gemini(Google AI)で要約→SSE minutes を発火するメインサービス
 import { MINUTES_CONFIG, FILLER_WORDS, MAX_DIGEST_LENGTH } from "@/configs/minutes.config.js";
+import { Delta30sSchema, type Delta30s } from "@/domain/minutes/index.js";
 import { transcriptEmitter } from "@/services/ws-relay.service.js";
 import { env } from "@/configs/env.js";
 import { Logger } from "@/utils/logger.js";
@@ -57,7 +58,83 @@ const WINDOW_MS = MINUTES_CONFIG.WINDOW_SEC * 1000;
 const EMIT_INTERVAL_MS = MINUTES_CONFIG.EMIT_INTERVAL_SEC * 1000;
 const STATE_TTL_MS = MINUTES_CONFIG.STATE_TTL_MIN * 60 * 1000;
 
+const LIVE_MINUTES_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: {
+      type: "array",
+      items: { type: "string" },
+    },
+    actions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          text: { type: "string" },
+          owner: { type: "string" },
+          due: { type: "string" },
+        },
+        required: ["text"],
+      },
+    },
+  },
+  required: ["summary", "actions"],
+};
+
+const DELTA_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    summaries: {
+      type: "array",
+      items: { type: "string" },
+    },
+    actions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          owner: { type: "string" },
+          task: { type: "string" },
+          due: { type: "string" },
+          confidence: { type: "number" },
+        },
+        required: ["task"],
+        additionalProperties: false,
+      },
+    },
+    decisions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          what: { type: "string" },
+          reason: { type: "string" },
+        },
+        required: ["what", "reason"],
+        additionalProperties: false,
+      },
+    },
+    questions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          topic: { type: "string" },
+          related_section_id: { type: "string" },
+          priority: { enum: ["low", "mid", "high"] },
+          confidence: { type: "number" },
+        },
+        required: ["topic"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["summaries", "actions"],
+  additionalProperties: false,
+};
+
 const PROMPT_TEMPLATE = `直近の会話ダイジェスト:\n----\n{DIGEST}\n----\n出力は JSON のみ（summary と actions）。規定のスキーマに完全一致させてください。`;
+const DELTA_PROMPT_TEMPLATE = `あなたは会議メモの確定版を作成するアシスタントです。直近30秒の会話ダイジェストを読み、以下の条件で JSON を出力してください。\n- summaries: 会話内の主要トピックを短い箇条書きで。1要約=1トピック、最大4件。\n- actions: 実行すべきタスク。可能であれば owner/due(YYYY-MM-DD)/confidence(0-1) を補完。\n- decisions: 明確に決まった事項があれば列挙。\n- questions: 未解決の論点や確認事項。priority は low/mid/high のいずれか。\n出力は JSON のみ。余計な説明を含めないでください。\n----\n{DIGEST}\n----`;
 const MINUTES_EVENT = "minutes" as const;
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -292,7 +369,10 @@ async function summarizeDigest(digest: string): Promise<LiveMinutes> {
   return normalizeLiveMinutes(jsonText);
 }
 
-async function requestGeminiJson(prompt: string): Promise<string> {
+async function requestGeminiJson(
+  prompt: string,
+  responseSchema: Record<string, unknown> = LIVE_MINUTES_RESPONSE_SCHEMA
+): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), MINUTES_CONFIG.REQUEST_TIMEOUT_MS);
 
@@ -307,28 +387,7 @@ async function requestGeminiJson(prompt: string): Promise<string> {
       responseMimeType: "application/json",
       temperature: MINUTES_CONFIG.TEMPERATURE,
       maxOutputTokens: MINUTES_CONFIG.MAX_TOKENS,
-      responseSchema: {
-        type: "object",
-        properties: {
-          summary: {
-            type: "array",
-            items: { type: "string" },
-          },
-          actions: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                text: { type: "string" },
-                owner: { type: "string" },
-                due: { type: "string" },
-              },
-              required: ["text"],
-            },
-          },
-        },
-        required: ["summary", "actions"],
-      },
+      responseSchema,
     },
   };
 
@@ -417,6 +476,36 @@ function normalizeLiveMinutes(jsonText: string): LiveMinutes {
     summary,
     actions,
   };
+}
+
+function normalizeDelta30s(jsonText: string): Delta30s {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(jsonText);
+  } catch {
+    throw new Error(`Failed to parse Delta30s JSON: ${jsonText}`);
+  }
+
+  return Delta30sSchema.parse(raw);
+}
+
+export async function generateDelta30sFromDigest(
+  digest: string,
+  metadata: { meetingId: string; windowStart: number; windowEnd: number }
+): Promise<Delta30s> {
+  const prompt = DELTA_PROMPT_TEMPLATE.replace("{DIGEST}", digest);
+  const jsonText = await requestGeminiJson(prompt, DELTA_RESPONSE_SCHEMA);
+  const delta = normalizeDelta30s(jsonText);
+  minutesLogger.debug("Delta30s generated", {
+    meetingId: metadata.meetingId,
+    windowStart: metadata.windowStart,
+    windowEnd: metadata.windowEnd,
+    summaryCount: delta.summaries.length,
+    actionCount: delta.actions.length,
+    decisionCount: delta.decisions?.length ?? 0,
+    questionCount: delta.questions?.length ?? 0,
+  });
+  return delta;
 }
 
 // レート制御の待機などに使うシンプルなタイマー
