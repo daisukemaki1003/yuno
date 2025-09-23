@@ -28,8 +28,9 @@
 - [x] **ドメイン型 / スキーマ定義**: `Delta30s`, `Action`, `Decision`, `Question`, `CurrentSectionList`, `SectionUpdateResponse` を TypeScript + Zod で定義し、`services/src/domain/minutes`（新設）に配置。
   - 実装: `services/src/domain/minutes/index.ts`
   - 検証: `pnpm test -- minutes.schema`
-- [ ] **設定ファイル雛形**: 30秒窓やしきい値を管理する `services/src/config/minutes-final.config.ts` を追加し、調整可能な値に TODO コメントを付与。
-  - 検証: 新設定が既存コードと競合しないこと。
+- [x] **設定ファイル雛形**: 30秒窓やしきい値を管理する `services/src/configs/minutes-final.config.ts` を追加し、調整可能な値に TODO コメントを付与。
+  - 実装: `MINUTES_FINAL_CONFIG` を定義し、再調整が必要な項目に TODO コメントを明記。
+  - 検証: 依存コード未導入のため構文チェックと単体テストで問題なし。
 - [ ] **Delta30s 生成サービス**: transcript (`TranscriptChunk`) を 30秒窓で集計し、summaries/actions/decisions/questions を構築するサービスを実装。LLM or ルール処理は抽象化し、JSON Schema に準拠。
   - 検証: 代表入力で Delta30s のフィールドが揃うこと、リトライ戦略が機能。
 - [ ] **Section 差分エンジン**: `CurrentSectionList` と最新 `Delta30s` を突き合わせて差分（新規/更新/クローズ + `change_summary`）を算出するロジックを実装。
