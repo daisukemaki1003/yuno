@@ -253,6 +253,9 @@ function scheduleCandidate(meetingId: string, state: MeetingState) {
   // ウィンドウ内の発話をまとめた digest を作り、キューに積む
   const candidate = buildDigest(state);
   if (!candidate) {
+    minutesLogger.debug("Digest candidate skipped: no utterances in window", {
+      meetingId,
+    });
     return;
   }
 
@@ -271,11 +274,21 @@ function scheduleCandidate(meetingId: string, state: MeetingState) {
 // 会議単位で Gemini 呼び出しを直列化し、必要に応じて待機時間を設ける
 async function processQueue(meetingId: string, state: MeetingState) {
   // 会議単位で LLM 呼び出しを直列化し、レート制御を掛ける
+  minutesLogger.debug("Minutes queue start", {
+    meetingId,
+    utterances: state.utterances.length,
+  });
   state.processing = true;
 
   while (state.nextCandidate) {
     const candidate = state.nextCandidate;
     state.nextCandidate = null;
+
+    minutesLogger.debug("Processing digest candidate", {
+      meetingId,
+      digestHash: candidate.digestHash,
+      digestLength: candidate.digest.length,
+    });
 
     if (!shouldProcessCandidate(meetingId, state, candidate)) {
       continue;
@@ -284,6 +297,10 @@ async function processQueue(meetingId: string, state: MeetingState) {
     const now = Date.now();
     if (state.lastEmitAt && now - state.lastEmitAt < EMIT_INTERVAL_MS) {
       const waitMs = EMIT_INTERVAL_MS - (now - state.lastEmitAt);
+      minutesLogger.debug("Waiting before processing candidate", {
+        meetingId,
+        waitMs,
+      });
       await sleep(waitMs);
       // After waiting, requeue the candidate if nothing newer arrived
       if (!state.nextCandidate) {
@@ -295,6 +312,10 @@ async function processQueue(meetingId: string, state: MeetingState) {
     const result = await generateSectionsWithRetry(candidate, meetingId, state);
 
     if (!result) {
+      minutesLogger.warn("Minutes generation returned null; using last result if available", {
+        meetingId,
+        hasFallback: Boolean(state.lastResult),
+      });
       if (state.lastResult) {
         const emittedAt = Date.now();
         state.lastEmitAt = emittedAt;
@@ -330,6 +351,10 @@ async function processQueue(meetingId: string, state: MeetingState) {
     });
   }
 
+  minutesLogger.debug("Minutes queue idle", {
+    meetingId,
+    utterances: state.utterances.length,
+  });
   state.processing = false;
 }
 
@@ -574,8 +599,27 @@ function normalizeChunk(event: unknown): TranscriptChunk | null {
 function handleTranscript(event: unknown) {
   const chunk = normalizeChunk(event);
   if (!chunk) {
+    minutesLogger.debug("Transcript event ignored: invalid payload", {
+      eventType: typeof event,
+    });
     return;
   }
+
+  minutesLogger.debug("Transcript chunk received", {
+    meetingId: chunk.meetingId,
+    isFinal: chunk.isFinal,
+    language: chunk.language,
+    confidence: chunk.confidence ?? null,
+    textLength: chunk.text?.length ?? 0,
+  });
+
+  minutesLogger.info("Transcript received", {
+    meetingId: chunk.meetingId,
+    isFinal: chunk.isFinal,
+    language: chunk.language,
+    confidence: chunk.confidence ?? null,
+    textPreview: chunk.text?.trim().slice(0, 120) ?? "",
+  });
 
   const confidence = chunk.confidence ?? 0;
   const skipReasons: string[] = [];
@@ -595,6 +639,8 @@ function handleTranscript(event: unknown) {
       reasons: skipReasons,
       confidence,
       language: chunk.language,
+      textLength: chunk.text?.length ?? 0,
+      textPreview: chunk.text?.trim().slice(0, 30) ?? "",
     });
     return;
   }
@@ -642,6 +688,8 @@ function handleTranscript(event: unknown) {
       meetingId,
       length: cleanedText.length,
       utteranceCount: state.utterances.length,
+      confidence,
+      textPreview: cleanedText.slice(0, 50),
     });
   }
 

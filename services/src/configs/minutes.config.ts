@@ -1,6 +1,6 @@
 // minutes サービス全体で参照する閾値・Gemini 設定
 export const MINUTES_CONFIG = {
-  CONF_MIN: 0.55,
+  CONF_MIN: 0.05,
   MERGE_GAP_MS: 1200,
   WINDOW_SEC: 90,
   EMIT_INTERVAL_SEC: 30,
@@ -14,15 +14,7 @@ export const MINUTES_CONFIG = {
 };
 
 // 文字起こしから軽く除去するフィラー語
-export const FILLER_WORDS = [
-  "えー",
-  "あの",
-  "その",
-  "なんか",
-  "はい",
-  "えっと",
-  "ですね",
-];
+export const FILLER_WORDS = ["えー", "あの", "その", "なんか", "はい", "えっと", "ですね"];
 
 // LLM へ渡すダイジェスト文字数の上限
 export const MAX_DIGEST_LENGTH = 450;
