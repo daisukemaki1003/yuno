@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-// transcriptEmitter にテスト用の文字列を流し込み、minutes.partial の確認を行うスクリプト
+// transcriptEmitter にテスト用の文字列を流し込み、minutes.sections の確認を行うスクリプト
 // 使い方例:
 // pnpm exec tsx tests/helpers/mock-transcript.ts --meetingId=test-001
 // pnpm exec tsx tests/helpers/mock-transcript.ts --text="カスタム文" --text="追加文"
@@ -163,7 +163,7 @@ async function main() {
   const normalized = normalizeEntries(options, entries);
   await sendTranscripts(options, normalized);
   console.info(
-    `[mock-transcript] minutes.partial が SSE で流れるか "GET /v1/meetings/${options.meetingId}/stream" で確認してください。`
+  `[mock-transcript] minutes.sections が SSE で流れるか "GET /v1/meetings/${options.meetingId}/stream" で確認してください。`
   );
 }
 

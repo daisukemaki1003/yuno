@@ -3,10 +3,18 @@ import { createHash } from "crypto";
 // transcript を集約→Gemini(Google AI)で要約→SSE minutes を発火するメインサービス
 import { MINUTES_CONFIG, FILLER_WORDS, MAX_DIGEST_LENGTH } from "@/configs/minutes.config.js";
 import { MINUTES_FINAL_CONFIG } from "@/configs/minutes-final.config.js";
-import { Delta30sSchema, type Delta30s } from "@/domain/minutes/index.js";
+import {
+  Delta30sSchema,
+  type Delta30s,
+  type SectionUpdateResponse,
+  type CurrentSectionList,
+  type SectionOutput,
+  type SectionInput,
+} from "@/domain/minutes/index.js";
 import { transcriptEmitter } from "@/services/ws-relay.service.js";
 import { env } from "@/configs/env.js";
 import { Logger } from "@/utils/logger.js";
+import { SectionDiffEngine } from "@/services/section-diff.service.js";
 
 export type TranscriptChunk = {
   meetingId: string;
@@ -17,14 +25,14 @@ export type TranscriptChunk = {
   timestamp: string;
 };
 
-export type LiveMinutes = {
-  summary: string[];
-  actions: { text: string; owner?: string; due?: string }[];
+export type SectionGenerationResult = {
+  delta: Delta30s;
+  update: SectionUpdateResponse;
 };
 
-export type MinutesEvent = {
+export type MinutesSectionsEvent = {
   meetingId: string;
-  live: LiveMinutes;
+  result: SectionGenerationResult;
   emittedAt: number;
   retry?: boolean;
 };
@@ -43,17 +51,19 @@ type DigestCandidate = {
 
 type MeetingState = {
   utterances: Utterance[];
-  lastLive: LiveMinutes | null;
+  lastResult: SectionGenerationResult | null;
   lastHash: string | null;
   lastEmitAt: number | null;
   processing: boolean;
   nextCandidate: DigestCandidate | null;
   ttlTimer: NodeJS.Timeout | null;
+  sectionsSnapshot: SectionOutput[];
 };
 
 const minutesLogger = new Logger("live-minutes");
 const liveMinutesEmitter = new EventEmitter();
 const meetingStates = new Map<string, MeetingState>();
+const sectionDiffEngine = new SectionDiffEngine();
 
 const WINDOW_MS = MINUTES_CONFIG.WINDOW_SEC * 1000;
 const EMIT_INTERVAL_MS = MINUTES_CONFIG.EMIT_INTERVAL_SEC * 1000;
@@ -112,7 +122,7 @@ const DELTA_RESPONSE_SCHEMA = {
 };
 
 const PROMPT_TEMPLATE = `あなたは会議メモの確定版を作成するアシスタントです。直近30秒の会話ダイジェストを読み、以下の条件で JSON を出力してください。\n- summaries: 会話内の主要トピックを短い箇条書きで。1要約=1トピック、最大4件。\n- actions: 実行すべきタスク。可能であれば owner/due(YYYY-MM-DD)/confidence(0-1) を補完。\n- decisions: 明確に決まった事項があれば列挙。\n- questions: 未解決の論点や確認事項。priority は low/mid/high のいずれか。\n出力は JSON のみ。余計な説明を含めないでください。\n----\n{DIGEST}\n----`;
-const MINUTES_EVENT = "minutes" as const;
+const MINUTES_EVENT = "minutes.sections" as const;
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 type GeminiContentPart = {
@@ -140,12 +150,13 @@ function getOrCreateState(meetingId: string): MeetingState {
 
   const fresh: MeetingState = {
     utterances: [],
-    lastLive: null,
+    lastResult: null,
     lastHash: null,
     lastEmitAt: null,
     processing: false,
     nextCandidate: null,
     ttlTimer: null,
+    sectionsSnapshot: [],
   };
   meetingStates.set(meetingId, fresh);
   resetTtl(meetingId, fresh);
@@ -281,16 +292,16 @@ async function processQueue(meetingId: string, state: MeetingState) {
       continue;
     }
 
-    const live = await summarizeWithRetry(candidate, meetingId, state.lastLive);
+    const result = await generateSectionsWithRetry(candidate, meetingId, state);
 
-    if (!live) {
-      if (state.lastLive) {
+    if (!result) {
+      if (state.lastResult) {
         const emittedAt = Date.now();
         state.lastEmitAt = emittedAt;
         state.lastHash = candidate.digestHash;
         liveMinutesEmitter.emit(MINUTES_EVENT, {
           meetingId,
-          live: state.lastLive,
+          result: state.lastResult,
           emittedAt,
           retry: true,
         });
@@ -303,15 +314,18 @@ async function processQueue(meetingId: string, state: MeetingState) {
       digestLength: candidate.digest.length,
       windowStart: candidate.queuedAt - MINUTES_FINAL_CONFIG.DELTA_WINDOW_SEC * 1000,
       windowEnd: candidate.queuedAt,
+      created: result.update.change_summary.created_sections.length,
+      updated: result.update.change_summary.updated_sections.length,
+      closed: result.update.change_summary.closed_sections.length,
     });
 
-    state.lastLive = live;
+    state.lastResult = result;
     state.lastHash = candidate.digestHash;
     state.lastEmitAt = Date.now();
 
     liveMinutesEmitter.emit(MINUTES_EVENT, {
       meetingId,
-      live,
+      result,
       emittedAt: state.lastEmitAt,
     });
   }
@@ -320,11 +334,11 @@ async function processQueue(meetingId: string, state: MeetingState) {
 }
 
 // Gemini 失敗時に規定回数リトライし、前回値へフォールバック
-async function summarizeWithRetry(
+async function generateSectionsWithRetry(
   candidate: DigestCandidate,
   meetingId: string,
-  previous: LiveMinutes | null
-): Promise<LiveMinutes | null> {
+  state: MeetingState
+): Promise<SectionGenerationResult | null> {
   const windowEnd = candidate.queuedAt;
   const windowStart = windowEnd - MINUTES_FINAL_CONFIG.DELTA_WINDOW_SEC * 1000;
 
@@ -335,7 +349,13 @@ async function summarizeWithRetry(
         windowStart,
         windowEnd,
       });
-      return convertDeltaToLiveMinutes(delta);
+
+      const update = buildSectionUpdate(meetingId, state, delta);
+      if (!update) {
+        return null;
+      }
+
+      return { delta, update };
     } catch (error) {
       minutesLogger.warn("Gemini summarize failed", {
         meetingId,
@@ -347,7 +367,7 @@ async function summarizeWithRetry(
     }
   }
 
-  return previous;
+  return null;
 }
 
 async function requestGeminiJson(
@@ -429,29 +449,66 @@ function normalizeDelta30s(jsonText: string): Delta30s {
   return Delta30sSchema.parse(raw);
 }
 
-function convertDeltaToLiveMinutes(delta: Delta30s): LiveMinutes {
-  const summary = delta.summaries
-    .filter((item) => typeof item === "string" && item.trim().length > 0)
-    .map((item) => item.trim())
-    .slice(0, MINUTES_CONFIG.MAX_SUMMARY);
-
-  const actions = delta.actions
-    .map((action) => {
-      const owner = action.owner && action.owner.trim().length > 0 ? action.owner.trim() : undefined;
-      const due = action.due && action.due.trim().length > 0 ? action.due.trim() : undefined;
-      return {
-        text: action.task.trim(),
-        owner,
-        due,
-      };
-    })
-    .filter((item) => item.text.length > 0)
-    .slice(0, MINUTES_CONFIG.MAX_ACTIONS);
-
-  return {
-    summary,
-    actions,
+function buildSectionUpdate(
+  meetingId: string,
+  state: MeetingState,
+  delta: Delta30s
+): SectionUpdateResponse | null {
+  const currentSections: CurrentSectionList = {
+    meeting_id: meetingId,
+    sections: state.sectionsSnapshot
+      .filter((section) => section.status !== "closed")
+      .map((section) => cloneSectionInput(section)),
   };
+
+  const update = sectionDiffEngine.diff(currentSections, delta);
+  if (update.changed_sections.length === 0) {
+    minutesLogger.info("Section diff produced no changes", {
+      meetingId,
+    });
+    return null;
+  }
+
+  applySectionUpdate(state, update);
+  return update;
+}
+
+function cloneSectionOutput(section: SectionOutput): SectionOutput {
+  return {
+    id: section.id,
+    title: section.title,
+    status: section.status,
+    bullets: [...section.bullets],
+    actions: section.actions.map((action) => ({ ...action })),
+  };
+}
+
+function cloneSectionInput(section: SectionOutput): SectionInput {
+  return {
+    id: section.id,
+    title: section.title,
+    status: section.status === "closed" ? "provisional" : (section.status as SectionInput["status"]),
+    bullets: [...section.bullets],
+    actions: section.actions.map((action) => ({ ...action })),
+  };
+}
+
+function applySectionUpdate(state: MeetingState, update: SectionUpdateResponse) {
+  const map = new Map<string, SectionOutput>();
+  for (const section of state.sectionsSnapshot) {
+    map.set(section.id, cloneSectionOutput(section));
+  }
+
+  for (const changed of update.changed_sections) {
+    if (changed.status === "closed") {
+      map.delete(changed.id);
+      continue;
+    }
+
+    map.set(changed.id, cloneSectionOutput(changed));
+  }
+
+  state.sectionsSnapshot = Array.from(map.values());
 }
 
 export async function generateDelta30sFromDigest(
@@ -595,19 +652,19 @@ function handleTranscript(event: unknown) {
 // Gladia からの transcript を minutes 処理に流し込む
 transcriptEmitter.on("transcript", handleTranscript);
 
-// 現在保持している最新 minutes を取得（SSE 接続時に初期送信）
-export function getLastLiveMinutes(meetingId: string): LiveMinutes | null {
+// 現在保持している最新 minutes（セクション差分）を取得（SSE 接続時に初期送信）
+export function getLastSectionUpdate(meetingId: string): SectionGenerationResult | null {
   const state = meetingStates.get(meetingId);
-  return state?.lastLive ?? null;
+  return state?.lastResult ?? null;
 }
 
-// minutes イベントを購読（SSE 側などから利用）
-export function onLiveMinutes(listener: (event: MinutesEvent) => void): void {
+// minutes.sections イベントを購読（SSE 側などから利用）
+export function onSectionUpdates(listener: (event: MinutesSectionsEvent) => void): void {
   liveMinutesEmitter.on(MINUTES_EVENT, listener);
 }
 
-// minutes イベント購読を解除
-export function offLiveMinutes(listener: (event: MinutesEvent) => void): void {
+// minutes.sections イベント購読を解除
+export function offSectionUpdates(listener: (event: MinutesSectionsEvent) => void): void {
   liveMinutesEmitter.off(MINUTES_EVENT, listener);
 }
 

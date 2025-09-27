@@ -4,7 +4,7 @@
 
 ## 目的 / スコープ
 
-* **目的**：会議中の文字起こし（JSONL断片）から、**30秒目安**で「いまの議事録」を**SSE**で配信する。
+* **目的**：会議中の文字起こし（JSONL断片）から、**30秒目安**で「いまの議事録差分（sections）」を**SSE**で配信する。
 * **前提**：**軽量LLMを常時使用**して要点・文面整形を行う（OFFは無し）。
 * **除外**：確定版の最終議事録、確認カード、DB保存、RAG、UI。
 
@@ -21,8 +21,8 @@
 
 ## 成果物（受け入れ基準 / DoD）
 
-- 文字起こしを投入すると、**最大 30 秒以内**に `minutes.partial` が 1 回以上届く。
-- 既存 SSE (`GET /v1/meetings/:meetingId/stream`) に `types` で `minutes` を指定し、Authorization / `x-meeting-baas-api-key` を付けると `event: minutes.partial` が受け取れる。
+- 文字起こしを投入すると、**最大 30 秒以内**に `minutes.sections` が 1 回以上届く。
+- 既存 SSE (`GET /v1/meetings/:meetingId/stream`) に `types` で `minutes` を指定し、Authorization / `x-meeting-baas-api-key` を付けると `event: minutes.sections` が受け取れる。
 - SSE ペイロードは **日本語の箇条書き 3〜5 行**の `summary` と **0〜3 件**の `actions`。
 - LLM 応答は**JSON Schema に適合**。崩れた場合は**1 回だけ自動再試行**し、それでも無理なら**直前の正常出力を再送**（黙るより安全）。
 - 同じ内容を連投しない（差分＆レート制御が有効）。
@@ -52,7 +52,7 @@
 - ルート：`GET /v1/meetings/:meetingId/stream?userId=...&types=minutes[,transcript]`
   - 認証ヘッダー：`Authorization: Bearer ...` / `x-meeting-baas-api-key: ...`（既存 SSE と同等）
   - `types` に複数指定する場合はカンマ区切り。`minutes` を含めたときだけ minutes 配信を受け取る。
-- イベント名：`minutes.partial`
+- イベント名：`minutes.sections`
 - keep-alive：既存実装に倣い `: ping` コメント + `event: ping`（20 秒間隔）を送る。
 - 例：
 
@@ -205,7 +205,7 @@ const live = JSON.parse(jsonText) as LiveMinutes;
 
 - 既存の `recordingSse`（`services/src/controllers/streams.controller.ts`）に minutes 配信を組み込む。
   - 接続時：minutes サービスから `lastLive`（あれば）を取得して即送信。
-  - 更新時：`event: "minutes.partial"\ndata: { ... }` を `stream.write` で送る。
+- 更新時：`event: "minutes.sections"\ndata: { ... }` を `stream.write` で送る。
   - keep-alive：既存の `ping` コメント/イベントを流用（追加は不要）。
   - 切断時は minutes サービス側の購読解除（`off`）を忘れない。
 
@@ -317,7 +317,7 @@ transcriptEmitter.on("transcript", async (chunk: TranscriptChunk) => {
 
 - **前処理ユニット**：低 confidence やノイズ断片が捨てられ、結合・窓抽出が正しく行われること。
 - **スキーマ検証**：`smallLLM.summarizeToJSON` の戻り値が **JSON Schema に通る**こと（LLM は実呼び出し。失敗しがちな環境では `it.skip` 可）。
-- **SSE 疑似**：疑似断片を minutes サービスに流し込み、`types=minutes` で接続したクライアントに `minutes.partial` が届く / `ping` は継続し、差分＆レート制御が効いていること。
+- **SSE 疑似**：疑似断片を minutes サービスに流し込み、`types=minutes` で接続したクライアントに `minutes.sections` が届く / `ping` は継続し、差分＆レート制御が効いていること。
 - **TTL 動作（オプション）**：`STATE_TTL_MIN` 経過後に状態が破棄され、新しい transcript で再初期化されること。
 
 > どうしても CI で LLM を叩きたくない場合のみ、\*\*固定 JSON を返す“軽量スタブ”\*\*に切替可能にしておいてください（本番コードは常に LLM を叩く）。
@@ -334,7 +334,7 @@ transcriptEmitter.on("transcript", async (chunk: TranscriptChunk) => {
 要件:
 - LLMは常時ON（OFFはなし）。JSON Schema厳守、崩れたら1回だけ再試行、ダメなら直前の正常値を再送。
 - 差分＆レート制御で連投しない。メモリのみ。STATE_TTL_MINで破棄。
-- SSE: GET /v1/meetings/:meetingId/stream?types=minutes / event: minutes.partial
+- SSE: GET /v1/meetings/:meetingId/stream?types=minutes / event: minutes.sections
 - ws-relay の `transcriptEmitter` を購読して minutes を更新（import されれば常時起動）。
 - LLMは Google Gemini (`gemini-2.0-flash`) 固定。`@google/genai` を使い、`responseMimeType: "application/json"` + `responseSchema` を指定する。
 

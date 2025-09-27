@@ -1,6 +1,6 @@
 # リアルタイム議事録機能の検証手順
 
-Gladia までの連携が済んでいる前提で、minutes（`minutes.partial`）が正しく配信されるかをローカルで確認する手順です。会議 URL を ID として扱う場合／任意の ID を使う場合の双方に対応しています。minutes の後段だけを素早く調べたい場合は「スクリプトで minutes を模擬する」節から読み始めてください。
+Gladia までの連携が済んでいる前提で、minutes（`minutes.sections`）が正しく配信されるかをローカルで確認する手順です。会議 URL を ID として扱う場合／任意の ID を使う場合の双方に対応しています。minutes の後段だけを素早く調べたい場合は「スクリプトで minutes を模擬する」節から読み始めてください。
 
 ---
 
@@ -28,7 +28,7 @@ Meeting BaaS (WebSocket) -> ws-relay.service (Gladia 中継) -> transcriptEmitte
                                               ↓
                            /v1/meetings/:meetingId/stream (SSE)
 
-minutes.partial は 30 秒サイクルを目安に配信されます。無音状態が続くとスキップされる点に注意してください。
+`minutes.sections` は 30 秒サイクルを目安に配信されます。無音状態が続くとスキップされる点に注意してください。
 ```
 
 ---
@@ -52,10 +52,32 @@ minutes.partial は 30 秒サイクルを目安に配信されます。無音状
      "http://localhost:<PORT>/v1/meetings/my-meeting-001/stream?userId=test&types=minutes,transcript"
    ```
    - `meetingId` は WebSocket で渡したものと同じにする。
-   - `types` に `minutes` を含めると `event: minutes.partial` が配信されます。
+   - `types` に `minutes` を含めると `event: minutes.sections` が配信されます。
     - 認証ヘッダーを省略すると `MISSING_AUTH` で弾かれるので注意。
 
-4. transcript が確定 (`isFinal=true`) すると `event: transcript` と `event: minutes.partial` が届きます。届かない場合は下記の「原因切り分け」を参照してください。
+4. transcript が確定 (`isFinal=true`) すると `event: transcript` と `event: minutes.sections` が届きます。届かない場合は下記の「原因切り分け」を参照してください。
+
+---
+
+## 2.5 セクション差分（minutes.sections）の検証ポイント
+
+1. **SSE ペイロードを観察する**  
+   上記の `curl` で `event: minutes.sections` が届いたら、次のフィールドを確認します。
+   - `delta.summaries / actions / decisions / questions` が 30 秒ウィンドウの内容を反映していること。
+   - `update.changed_sections` に新規/更新セクションのみが含まれていること。
+   - `update.change_summary` の `created_sections` / `updated_sections` / `closed_sections` が常に存在し、期待どおりの ID を持つこと。
+
+2. **類似トピックが既存セクションへ反映されるか確認する**  
+   既存セクションに近い要約文が `delta.summaries` に含まれるケースでは、該当セクションの `bullets` が更新され、`change_summary.updated_sections` にその ID が含まれることを確認します。
+
+3. **新規トピックでセクションが作成されるか確認する**  
+   既存セクションと関連が薄い要約文を送ると、新しい `sec_...` ID のセクションが `changed_sections` に追加され、`change_summary.created_sections` に反映されるはずです。
+
+4. **差分の継続観察**  
+   同じ会議 ID で複数回モックを送信すると、`sectionsSnapshot` が維持され、不要な重複セクションが増えないことを確認します。
+
+5. **テストでロジックを再確認する**  
+   自動化された差分ロジックは `pnpm test -- section-diff` で検証できます。CLI 出力に `2 passed` が表示されればユニットテストが成功しています。
 
 ---
 
@@ -75,12 +97,12 @@ pnpm exec tsx tests/helpers/mock-transcript.ts --meetingId=mock-meeting-001
 - 認証ヘッダーはスクリプトが自動で付与します（`Authorization: Bearer mock-script-token` と `x-meeting-baas-api-key: 0ad6…2613`）。
 - `--text "..."` を指定すると、フィクスチャの代わりに任意の transcript 文を送信できます（複数指定可、各行 40 文字以上になるようにする）。
 - タイムスタンプは 1.5 秒刻みで付与されるため、`MERGE_GAP_MS` を超えた個別発話として扱われます。
-- SSE の購読は前節と同じ `curl …/stream` を利用してください。実行中のターミナルで `event: minutes.partial` が届けば成功です。
+- SSE の購読は前節と同じ `curl …/stream` を利用してください。実行中のターミナルで `event: minutes.sections` が届けば成功です。
 
 スクリプト実行後は `pnpm --filter server dev` 側で次のようなログを確認できます。
 - `Mock transcripts emitted` … エンドポイントが受け取った件数
 - `Transcript accepted / merged / ignored` … 発話が minutes の条件を満たしたかどうか
-- `Digest candidate queued` と `Minutes generated` … Gemini へのリクエストと minutes.partial 送信が行われたサイン
+- `Digest candidate queued` と `Minutes generated` … Gemini へのリクエストと `minutes.sections` 送信が行われたサイン
 
 ### curl で直接叩く
 
@@ -125,6 +147,7 @@ curl -X POST \
 | confidence が 0.55 以上か | 低すぎる transcript は minutes の対象外になります。必要であれば `services/src/configs/minutes.config.ts` の `CONF_MIN` を調整してください。 |
 | digest が作られているか | 90 秒以内に合計 40 文字以上の transcript がないと LLM を呼びません。任意のテキストを emit してテストすると切り分けが容易です。 |
 | Gemini エラーが出ていないか | `pnpm dev` のターミナルに `Gemini summarize failed` が表示されていないか確認。API キーやレスポンスの JSON 化エラーが原因の場合があります。 |
+| Section diff が空になっていないか | `Minutes generated` のログに `created` / `updated` / `closed` の件数が出力されます。常に 0 のままの場合は `section-diff` テストやデータ内容を確認してください。 |
 
 開発サーバーでは `Transcript accepted` / `Digest candidate queued` / `Minutes generated` などの info ログが出力されます。これらが出ていない場合は上記チェックリストを参照してください。
 

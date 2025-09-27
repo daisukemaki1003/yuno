@@ -5,10 +5,10 @@ import { badRequest } from "@/utils/errors.js";
 import type { Logger } from "@/utils/logger.js";
 import { transcriptEmitter } from "@/services/ws-relay.service.js";
 import {
-  getLastLiveMinutes,
-  onLiveMinutes,
-  offLiveMinutes,
-  type MinutesEvent,
+  getLastSectionUpdate,
+  onSectionUpdates,
+  offSectionUpdates,
+  type MinutesSectionsEvent,
 } from "@/services/live-minutes.service.js";
 
 /**
@@ -43,7 +43,7 @@ export async function recordingSse(c: Context): Promise<Response> {
   return stream(c, async (stream) => {
     let pingInterval: NodeJS.Timeout | null = null;
     let gladiaListener: ((data: unknown) => void) | null = null;
-    let minutesListener: ((event: MinutesEvent) => void) | null = null;
+    let minutesListener: ((event: MinutesSectionsEvent) => void) | null = null;
 
     try {
       logger.info("Using WebSocket relay mode for streaming");
@@ -104,25 +104,37 @@ export async function recordingSse(c: Context): Promise<Response> {
 
       if (types.has("minutes")) {
         // 接続直後に最新の minutes を 1 度返しておく
-        const lastLive = getLastLiveMinutes(meetingId);
-        if (lastLive) {
+        const lastResult = getLastSectionUpdate(meetingId);
+        if (lastResult) {
+          const payload = {
+            meetingId,
+            emittedAt: Date.now(),
+            update: lastResult.update,
+            delta: lastResult.delta,
+          };
           await stream.write(
-            `event: minutes.partial\ndata: ${JSON.stringify(lastLive)}\n\n`
+            `event: minutes.sections\ndata: ${JSON.stringify(payload)}\n\n`
           );
         }
 
-        minutesListener = (event: MinutesEvent) => {
+        minutesListener = (event: MinutesSectionsEvent) => {
           if (event.meetingId !== meetingId) {
             return;
           }
 
           // new minutes が生成される度に push 配信
           void stream.write(
-            `event: minutes.partial\ndata: ${JSON.stringify(event.live)}\n\n`
+            `event: minutes.sections\ndata: ${JSON.stringify({
+              meetingId: event.meetingId,
+              emittedAt: event.emittedAt,
+              update: event.result.update,
+              delta: event.result.delta,
+              retry: event.retry ?? false,
+            })}\n\n`
           );
         };
 
-        onLiveMinutes(minutesListener);
+        onSectionUpdates(minutesListener);
       }
 
       // Send retry directive
@@ -168,7 +180,7 @@ export async function recordingSse(c: Context): Promise<Response> {
       }
 
       if (minutesListener) {
-        offLiveMinutes(minutesListener);
+        offSectionUpdates(minutesListener);
       }
     }
   });

@@ -17,6 +17,19 @@
 
 SSE では 20 秒ごとに `event: ping` を送信し、`event: transcript` に文字起こしデータが格納されます。文字列長が 32 KB を超える場合はサーバー側でテキストをトリミングします。
 
+#### `curl` でのストリーム購読例
+```bash
+curl -N \
+  -H "Accept: text/event-stream" \
+  -H "Cache-Control: no-cache" \
+  -H "Authorization: Bearer <token>" \
+  -H "x-meeting-baas-api-key: <api-key>" \
+  "http://localhost:8787/v1/meetings/<meetingId>/stream?userId=<userId>&mode=raw&types=transcript"
+```
+- `-N` (`--no-buffer`) でバッファリングを無効化し、イベントをリアルタイムに表示します。
+- SSE は永続接続のため、コマンドは受信待機を継続します。`types` を絞ることで不要なイベントを省けます。
+- 認証が不要なローカル実行環境では該当ヘッダーを省略してください。
+
 ## WebSocket Endpoint
 | Path | 説明 | 認証 | ハンドラー |
 | --- | --- | --- | --- |
