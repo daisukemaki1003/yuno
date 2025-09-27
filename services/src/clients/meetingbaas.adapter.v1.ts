@@ -38,6 +38,15 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
     const url = this.buildUrl(this.config.endpoints.addBot.path, {});
     const headers = this.buildHeaders();
 
+    const meetingId = deriveMeetingId(meetingUrl);
+    if (!meetingId) {
+      this.logger.warn("Failed to derive meetingId from meetingUrl", { meetingUrl });
+    }
+
+    const streamingBase = meetingId
+      ? `${env.PUBLIC_WS_BASE}/mb-input?meetingId=${encodeURIComponent(meetingId)}`
+      : `${env.PUBLIC_WS_BASE}/mb-input`;
+
     const requestBody = {
       bot_name: botName || "Meeting Bot",
       meeting_url: meetingUrl,
@@ -52,8 +61,8 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       },
       streaming: {
         audio_frequency: "16khz", // Meeting BaaS uses "16khz", not sample_rate
-        input: `${env.PUBLIC_WS_BASE}/mb-input`,
-        output: `${env.PUBLIC_WS_BASE}/mb-input`, // Same as input for now
+        input: streamingBase,
+        output: streamingBase, // Same endpoint for now
       },
     };
 
@@ -160,5 +169,26 @@ class MeetingBaasAdapterV1 implements MeetingBaasPort {
       return err;
     }
     return internal("UNKNOWN_ERROR", "An unknown error occurred");
+  }
+}
+
+function deriveMeetingId(meetingUrl: string): string | null {
+  if (!meetingUrl) {
+    return null;
+  }
+
+  try {
+    const url = new URL(meetingUrl);
+    const knownPattern = url.pathname.match(/[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}/i);
+    if (knownPattern) {
+      return knownPattern[0].toLowerCase();
+    }
+
+    const segments = url.pathname.split("/").filter(Boolean);
+    const last = segments.pop();
+    return last ? last.toLowerCase() : null;
+  } catch {
+    const fallbackMatch = meetingUrl.match(/[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}/i);
+    return fallbackMatch ? fallbackMatch[0].toLowerCase() : null;
   }
 }

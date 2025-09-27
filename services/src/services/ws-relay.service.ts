@@ -233,17 +233,7 @@ function handleGladiaMessage(session: RelaySession, data: WebSocket.Data) {
   const { logger } = session;
 
   try {
-    const rawPayload = data instanceof Buffer ? data.toString("utf8") : String(data);
-    const truncatedPayload =
-      rawPayload.length > 4000 ? `${rawPayload.slice(0, 4000)}...[truncated]` : rawPayload;
-
-    logger.info("Gladia WS message", {
-      meetingId: session.meetingId ?? null,
-      payloadPreview: truncatedPayload,
-      payloadLength: rawPayload.length,
-    });
-
-    const message = JSON.parse(rawPayload) as GladiaTranscriptEvent;
+    const message = JSON.parse(data.toString()) as GladiaTranscriptEvent;
 
     if (message.type === "transcript" && message.data) {
       // Handle both old and new Gladia response formats
@@ -285,20 +275,6 @@ function handleGladiaMessage(session: RelaySession, data: WebSocket.Data) {
         timestamp: new Date().toISOString(),
       });
 
-      if (!session.meetingId) {
-        logger.warn("Transcript received without meetingId", {
-          textPreview: text?.slice(0, 120) ?? "",
-        });
-      }
-
-      logger.info("Gladia transcript normalized", {
-        meetingId: session.meetingId ?? null,
-        isFinal,
-        language,
-        confidence,
-        textPreview: text?.slice(0, 120) ?? "",
-      });
-
       // minutes サービスでも利用できるよう confidence を含めて通知
       transcriptEmitter.emit("transcript", {
         meetingId: session.meetingId,
@@ -315,14 +291,10 @@ function handleGladiaMessage(session: RelaySession, data: WebSocket.Data) {
       transcriptLogger.logError(message, { meetingId: session.meetingId });
     } else if (message.type !== "ready" && message.type !== "connected") {
       // Only log unexpected event types
-      logger.debug("Gladia event", { type: message.type, meetingId: session.meetingId ?? null });
+      // logger.debug("Gladia event", { type: message.type });
     }
   } catch (error) {
-    logger.error("Failed to parse Gladia message", {
-      error,
-      meetingId: session.meetingId ?? null,
-      raw: data instanceof Buffer ? data.toString("utf8") : String(data),
-    });
+    logger.error("Failed to parse Gladia message", { error, data: data.toString() });
   }
 }
 
@@ -453,6 +425,9 @@ export async function setupWebSocketRelay(ws: WebSocket, logger: Logger, meeting
   };
 
   logger.info("Setting up WebSocket relay", { meetingId });
+  if (!meetingId) {
+    logger.warn("WebSocket relay connected without meetingId query parameter");
+  }
 
   relaySessions.set(ws, session);
 
@@ -496,6 +471,9 @@ export async function setupWebSocketRelay(ws: WebSocket, logger: Logger, meeting
         // Extract meetingId if provided
         if (message.meetingId) {
           session.meetingId = message.meetingId;
+          logger.info("MeetingId set from MBaaS control message", {
+            meetingId: session.meetingId,
+          });
         }
       } catch {
         logger.warn("Received non-JSON text message", { data: data.toString() });
