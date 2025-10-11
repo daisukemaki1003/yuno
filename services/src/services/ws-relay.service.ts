@@ -3,6 +3,7 @@ import { env } from "@/configs/env.js";
 import { Logger } from "@/utils/logger.js";
 import { HttpClient } from "@/clients/http.client.js";
 import { transcriptLogger } from "@/utils/transcript-logger.js";
+import { minutesLogWriter } from "@/utils/minutes-log-writer.js";
 
 // Types for Gladia API
 interface GladiaInitResponse {
@@ -265,6 +266,8 @@ function handleGladiaMessage(session: RelaySession, data: WebSocket.Data) {
         });
       }
 
+      const logTimestamp = new Date().toISOString();
+
       // Log all transcripts to file
       transcriptLogger.logTranscript({
         meetingId: session.meetingId,
@@ -272,7 +275,15 @@ function handleGladiaMessage(session: RelaySession, data: WebSocket.Data) {
         language: language || "unknown",
         isFinal,
         confidence,
-        timestamp: new Date().toISOString(),
+        timestamp: logTimestamp,
+      });
+
+      minutesLogWriter.logTranscript(session.meetingId, {
+        text: text || "",
+        language: language || "unknown",
+        isFinal,
+        confidence,
+        timestamp: logTimestamp,
       });
 
       // minutes サービスでも利用できるよう confidence を含めて通知
@@ -283,7 +294,7 @@ function handleGladiaMessage(session: RelaySession, data: WebSocket.Data) {
         text: text || "",
         language: language || "unknown",
         confidence,
-        timestamp: new Date().toISOString(),
+        timestamp: logTimestamp,
       });
     } else if (message.type === "error") {
       logger.error("Gladia error event", { message });

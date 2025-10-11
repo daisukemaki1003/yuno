@@ -49,7 +49,7 @@ export const StreamModeSchema = z.enum(['raw', 'normalized']).default('raw');
 
 // SSE で購読できるイベント種別を minutes 対応込みで定義
 const STREAM_TYPES = ['audio', 'transcript', 'event', 'minutes'] as const;
-const DEFAULT_STREAM_TYPES = ['audio', 'transcript', 'event'] as const;
+const DEFAULT_STREAM_TYPES = ['audio', 'transcript', 'event', 'minutes'] as const;
 
 export const StreamTypeSchema = z.enum(STREAM_TYPES);
 

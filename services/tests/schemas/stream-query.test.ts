@@ -3,13 +3,13 @@ import { StreamQuerySchema } from "../../src/schemas/http.v1.js";
 
 // minutes イベント追加に伴う types パラメータの挙動を検証
 describe("StreamQuerySchema", () => {
-  it("should default to audio/transcript/event when types not provided", () => {
+  it("should include minutes in default types when not provided", () => {
     const result = StreamQuerySchema.parse({
       userId: "user-1",
       mode: "raw",
     });
 
-    expect(Array.from(result.types)).toEqual(["audio", "transcript", "event"]);
+    expect(Array.from(result.types)).toEqual(["audio", "transcript", "event", "minutes"]);
   });
 
   it("should accept minutes when explicitly requested", () => {

@@ -1,283 +1,397 @@
-import { MINUTES_FINAL_CONFIG } from "@/configs/minutes-final.config.js";
+import type { Delta30s } from "@/domain/minutes/delta30s.schema.js";
 import {
-  type Delta30s,
-  type MinutesAction,
+  ActiveSectionSchema,
   type CurrentSectionList,
-  type SectionOutput,
-  type SectionUpdateResponse,
+  CurrentSectionListSchema,
+  type Section,
+  SectionActionSchema,
+  type SectionAction,
+  SectionSchema,
   SectionUpdateResponseSchema,
+  type SectionUpdateResponse,
 } from "@/domain/minutes/index.js";
 
-type SectionMatch = {
-  section: SectionOutput;
+interface SectionDraft {
+  section: Section;
   created: boolean;
-};
+  changed: boolean;
+}
 
-const SUMMARY_SIMILARITY_THRESHOLD = 0.25;
-const ACTION_SIMILARITY_THRESHOLD = 0.2;
+const SUMMARY_MATCH_THRESHOLD = 0.2;
+const TEXT_MATCH_THRESHOLD = 0.2;
 
-export class SectionDiffEngine {
-  diff(
-    current: CurrentSectionList,
-    delta: Delta30s
-  ): SectionUpdateResponse {
-    const normalizedSections = current.sections.map((section) =>
-      cloneSection(section)
-    );
+export class SectionDiffService {
+  // Delta30s と最新セクション一覧から差分を生成するエントリーポイント
+  diff(meetingId: string, delta: Delta30s, currentList?: CurrentSectionList | null): SectionUpdateResponse {
+    const normalizedCurrent = this.normalizeCurrentList(meetingId, currentList);
+    const drafts = this.buildInitialDrafts(normalizedCurrent.sections);
 
-    const sectionMap = new Map<string, SectionMatch>();
-    normalizedSections.forEach((section) =>
-      sectionMap.set(section.id, { section, created: false })
-    );
+    this.applySummaries(drafts, delta.summaries);
+    this.applyActions(drafts, delta.actions);
+    this.applyDecisions(drafts, delta.decisions);
+    this.applyQuestions(drafts, delta.questions);
 
-    const createdSections: SectionOutput[] = [];
-    const updatedSections = new Set<string>();
+    return this.buildResponse(normalizedCurrent.meeting_id, drafts);
+  }
 
-    for (const summary of delta.summaries) {
-      const cleanedSummary = summary.trim();
-      if (!cleanedSummary) {
+  private normalizeCurrentList(meetingId: string, currentList: CurrentSectionList | null | undefined): CurrentSectionList {
+    if (!currentList) {
+      return CurrentSectionListSchema.parse({ meeting_id: meetingId, sections: [] });
+    }
+
+    return CurrentSectionListSchema.parse(currentList);
+  }
+
+  // 現在のセクションをドラフト構造に変換（ここで mutable なワークコピーを作る）
+  private buildInitialDrafts(sections: CurrentSectionList["sections"]): Map<string, SectionDraft> {
+    const drafts = new Map<string, SectionDraft>();
+
+    for (const section of sections) {
+      const parsed = ActiveSectionSchema.parse(section);
+      drafts.set(parsed.id, {
+        section: {
+          id: parsed.id,
+          title: parsed.title,
+          summary: parsed.summary,
+          status: parsed.status === "provisional" ? "provisional" : "active",
+          actions: parsed.actions ? [...parsed.actions] : [],
+          decisions: parsed.decisions ? [...parsed.decisions] : [],
+          questions: parsed.questions ? [...parsed.questions] : [],
+        },
+        created: false,
+        changed: false,
+      });
+    }
+
+    return drafts;
+  }
+
+  private applySummaries(drafts: Map<string, SectionDraft>, summaries: string[]): void {
+    for (const summary of summaries) {
+      const trimmed = summary.trim();
+      if (!trimmed) {
         continue;
       }
 
-      const match = findBestSectionMatch(cleanedSummary, sectionMap);
-      if (match && match.score >= SUMMARY_SIMILARITY_THRESHOLD) {
-        const { section } = match;
-        if (!section.bullets.includes(cleanedSummary)) {
-          section.bullets.push(cleanedSummary);
-          trimArray(section.bullets, MINUTES_FINAL_CONFIG.SECTION_MAX_BULLETS);
+      const match = this.findBestSectionMatch(trimmed, drafts);
+      if (match && match.score >= SUMMARY_MATCH_THRESHOLD) {
+        const draft = drafts.get(match.section.id);
+        if (!draft) {
+          continue;
         }
-        updatedSections.add(section.id);
+
+        // 要約が一致した既存セクションは最新 summary を上書きし、 provisional なら active に昇格
+        if (draft.section.summary !== trimmed) {
+          draft.section.summary = trimmed;
+          draft.changed = true;
+        }
+
+        if (draft.section.status === "provisional") {
+          draft.section.status = "active";
+          draft.changed = true;
+        }
       } else {
-        const newSection = createSectionFromSummary(
-          cleanedSummary,
-          sectionMap
-        );
-        createdSections.push(newSection);
+        const draft = this.createSectionDraft(trimmed, drafts);
+        drafts.set(draft.section.id, draft);
       }
     }
+  }
 
-    const allSections = [...sectionMap.values()].map((entry) => entry.section);
-    const assignableSections = [...allSections, ...createdSections];
-
-    for (const action of delta.actions) {
-      const targetSection = findSectionForAction(
-        action,
-        assignableSections,
-        createdSections
-      );
-      (targetSection.actions ||= []);
-      if (!targetSection.actions.some((existing) => existing.task === action.task)) {
-        targetSection.actions.push(normalizeAction(action));
+  // 行動項目・決定・質問はいずれもテキスト類似度で紐付け、重複を除去してから追加する
+  private applyActions(drafts: Map<string, SectionDraft>, actions: Delta30s["actions"]): void {
+    for (const action of actions) {
+      const target = this.findBestTextMatch(action.task, drafts) ?? this.findMostRecentDraft(drafts);
+      if (!target) {
+        continue;
       }
 
-      if (!createdSections.includes(targetSection)) {
-        updatedSections.add(targetSection.id);
+      const sanitized = this.sanitiseAction(action);
+      if (!sanitized) {
+        continue;
       }
-    }
 
-    if (delta.decisions) {
-      for (const decision of delta.decisions) {
-        const bullet = `決定: ${decision.what}`;
-        const target = findSectionByPriority(assignableSections);
-        if (!target.bullets.includes(bullet)) {
-          target.bullets.push(bullet);
-          trimArray(target.bullets, MINUTES_FINAL_CONFIG.SECTION_MAX_BULLETS);
-        }
-        if (!createdSections.includes(target)) {
-          updatedSections.add(target.id);
+      target.section.actions ||= [];
+      const existing = target.section.actions;
+      if (!this.hasDuplicateAction(existing, sanitized)) {
+        existing.push(sanitized);
+        if (!target.created) {
+          target.changed = true;
         }
       }
     }
+  }
 
-    if (delta.questions) {
-      for (const question of delta.questions) {
-        const bullet = `未解決: ${question.topic}`;
-        const target = findSectionByPriority(assignableSections, question.related_section_id);
-        if (!target.bullets.includes(bullet)) {
-          target.bullets.push(bullet);
-          trimArray(target.bullets, MINUTES_FINAL_CONFIG.SECTION_MAX_BULLETS);
-        }
-        if (!createdSections.includes(target)) {
-          updatedSections.add(target.id);
+  private applyDecisions(drafts: Map<string, SectionDraft>, decisions: Delta30s["decisions"]): void {
+    for (const decision of decisions) {
+      const target = this.findBestTextMatch(decision.summary, drafts) ?? this.findMostRecentDraft(drafts);
+      if (!target) {
+        continue;
+      }
+
+      target.section.decisions ||= [];
+      const normalized = decision.summary.trim();
+      if (!normalized) {
+        continue;
+      }
+
+      if (!target.section.decisions.some((d) => d.summary.toLowerCase() === normalized.toLowerCase())) {
+        target.section.decisions.push({ summary: normalized });
+        if (!target.created) {
+          target.changed = true;
         }
       }
     }
+  }
 
-    const updatedSectionOutputs = [...updatedSections]
-      .map((id) => sectionMap.get(id)?.section)
-      .filter((section): section is SectionOutput => Boolean(section));
+  private applyQuestions(drafts: Map<string, SectionDraft>, questions: Delta30s["questions"]): void {
+    for (const question of questions) {
+      const target = this.findBestTextMatch(question.question, drafts) ?? this.findMostRecentDraft(drafts);
+      if (!target) {
+        continue;
+      }
 
-    const changedSections: SectionOutput[] = [
-      ...updatedSectionOutputs,
-      ...createdSections,
-    ];
+      target.section.questions ||= [];
+      const normalized = question.question.trim();
+      if (!normalized) {
+        continue;
+      }
 
-    const response: SectionUpdateResponse = {
-      meeting_id: current.meeting_id,
+      if (!target.section.questions.some((q) => q.question.toLowerCase() === normalized.toLowerCase())) {
+        target.section.questions.push({ question: normalized });
+        if (!target.created) {
+          target.changed = true;
+        }
+      }
+    }
+  }
+
+  private buildResponse(meetingId: string, drafts: Map<string, SectionDraft>): SectionUpdateResponse {
+    const changedSections: Section[] = [];
+    const createdIds: string[] = [];
+    const updatedIds: string[] = [];
+
+    for (const draft of drafts.values()) {
+      if (draft.created) {
+        createdIds.push(draft.section.id);
+        changedSections.push(this.compactSection(draft.section));
+      } else if (draft.changed) {
+        updatedIds.push(draft.section.id);
+        changedSections.push(this.compactSection(draft.section));
+      }
+    }
+
+    const response = {
+      meeting_id: meetingId,
       changed_sections: changedSections,
       change_summary: {
-        created_sections: createdSections.map((section) => section.id),
-        updated_sections: updatedSectionOutputs.map((section) => section.id),
+        created_sections: createdIds,
+        updated_sections: updatedIds,
         closed_sections: [],
       },
-    };
+    } satisfies SectionUpdateResponse;
 
     return SectionUpdateResponseSchema.parse(response);
   }
-}
 
-function cloneSection(section: CurrentSectionList["sections"][number]): SectionOutput {
-  return {
-    id: section.id,
-    title: section.title,
-    status: section.status,
-    bullets: [...section.bullets],
-    actions: section.actions ? [...section.actions] : [],
-  };
-}
-
-function normalizeAction(action: MinutesAction): MinutesAction {
-  return {
-    task: action.task.trim(),
-    owner: action.owner?.trim() || undefined,
-    due: action.due ?? undefined,
-    confidence: action.confidence,
-  };
-}
-
-function findBestSectionMatch(
-  summary: string,
-  sections: Map<string, SectionMatch>
-): { section: SectionOutput; score: number } | null {
-  let best: { section: SectionOutput; score: number } | null = null;
-  for (const entry of sections.values()) {
-    const baseText = `${entry.section.title} ${entry.section.bullets.join(" ")}`;
-    let score = computeSimilarity(summary, baseText);
-    if (
-      summary.includes(entry.section.title) ||
-      entry.section.title.includes(summary) ||
-      entry.section.bullets.some((bullet) => summary.includes(bullet) || bullet.includes(summary))
-    ) {
-      score = Math.max(score, 1);
+  private findBestSectionMatch(summary: string, drafts: Map<string, SectionDraft>): { section: Section; score: number } | null {
+    let best: { section: Section; score: number } | null = null;
+    for (const draft of drafts.values()) {
+      const score = this.computeSummaryScore(summary, draft.section);
+      if (!best || score > best.score) {
+        best = { section: draft.section, score };
+      }
     }
-    if (!best || score > best.score) {
-      best = { section: entry.section, score };
+    return best;
+  }
+
+  private createSectionDraft(summary: string, drafts: Map<string, SectionDraft>): SectionDraft {
+    const id = this.generateSectionId(summary, drafts);
+    const title = this.generateSectionTitle(summary);
+    return {
+      section: {
+        id,
+        title,
+        summary,
+        status: "provisional",
+        actions: [],
+        decisions: [],
+        questions: [],
+      },
+      created: true,
+      changed: true,
+    };
+  }
+
+  private findBestTextMatch(text: string, drafts: Map<string, SectionDraft>): SectionDraft | null {
+    let best: { draft: SectionDraft; score: number } | null = null;
+    for (const draft of drafts.values()) {
+      const score = this.computeTextScore(text, draft.section);
+      if (!best || score > best.score) {
+        best = { draft, score };
+      }
     }
-  }
-  return best;
-}
 
-function createSectionFromSummary(
-  summary: string,
-  sections: Map<string, SectionMatch>
-): SectionOutput {
-  const id = generateSectionId(summary, sections);
-  const section: SectionOutput = {
-    id,
-    title: generateSectionTitle(summary),
-    status: "provisional",
-    bullets: [summary],
-    actions: [],
-  };
-  sections.set(id, { section, created: true });
-  return section;
-}
-
-function generateSectionId(summary: string, sections: Map<string, SectionMatch>): string {
-  const base = slugify(summary || "new-section");
-  let candidate = `sec_${base}`;
-  let suffix = 1;
-  while (sections.has(candidate)) {
-    candidate = `sec_${base}_${suffix++}`;
-  }
-  return candidate;
-}
-
-function generateSectionTitle(summary: string): string {
-  const words = summary.split(/\s+/).slice(0, 4);
-  return words.join(" ");
-}
-
-function slugify(text: string): string {
-  const normalized = text
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
-  return normalized.slice(0, 32) || "topic";
-}
-
-function computeSimilarity(a: string, b: string): number {
-  if (!a || !b) {
-    return 0;
-  }
-
-  const setA = new Set(tokenize(a));
-  const setB = new Set(tokenize(b));
-
-  if (setA.size === 0 || setB.size === 0) {
-    return 0;
-  }
-
-  let intersection = 0;
-  for (const token of setA) {
-    if (setB.has(token)) {
-      intersection += 1;
+    if (best && best.score >= TEXT_MATCH_THRESHOLD) {
+      return best.draft;
     }
+
+    return null;
   }
 
-  return intersection / Math.max(setA.size, setB.size);
-}
-
-function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[^a-z0-9\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]+/u)
-    .filter(Boolean);
-}
-
-function trimArray<T>(array: T[], maxLength: number): void {
-  if (array.length > maxLength) {
-    array.splice(0, array.length - maxLength);
-  }
-}
-
-function findSectionForAction(
-  action: MinutesAction,
-  sections: SectionOutput[],
-  createdSections: SectionOutput[]
-): SectionOutput {
-  let best: { section: SectionOutput; score: number } | null = null;
-  for (const section of sections) {
-    const score = computeSimilarity(action.task, `${section.title} ${section.bullets.join(" ")}`);
-    if (!best || score > best.score) {
-      best = { section, score };
+  private findMostRecentDraft(drafts: Map<string, SectionDraft>): SectionDraft | null {
+    const createdDrafts = Array.from(drafts.values()).filter((draft) => draft.created);
+    if (createdDrafts.length > 0) {
+      return createdDrafts[createdDrafts.length - 1];
     }
+    return drafts.values().next().value ?? null;
   }
 
-  if (best && best.score >= ACTION_SIMILARITY_THRESHOLD) {
-    return best.section;
-  }
+  private sanitiseAction(action: Delta30s["actions"][number]): SectionAction | null {
+    const parsed = SectionActionSchema.safeParse({
+      task: action.task.trim(),
+      owner: action.owner?.trim() || undefined,
+      due: action.due,
+    });
 
-  if (createdSections.length > 0) {
-    return createdSections[createdSections.length - 1];
-  }
-
-  return sections[0];
-}
-
-function findSectionByPriority(
-  sections: SectionOutput[],
-  preferredId?: string
-): SectionOutput {
-  if (preferredId) {
-    const preferred = sections.find((section) => section.id === preferredId);
-    if (preferred) {
-      return preferred;
+    if (!parsed.success) {
+      return null;
     }
+
+    return parsed.data;
   }
 
-  const active = sections.find((section) => section.status === "active");
-  return active ?? sections[0];
+  private hasDuplicateAction(actions: SectionAction[] | undefined, incoming: SectionAction): boolean {
+    if (!actions || actions.length === 0) {
+      return false;
+    }
+
+    const key = this.actionKey(incoming);
+    return actions.some((action) => this.actionKey(action) === key);
+  }
+
+  private actionKey(action: SectionAction): string {
+    const owner = action.owner?.toLowerCase() ?? "";
+    const due = action.due ?? "";
+    return `${action.task.toLowerCase()}|${owner}|${due}`;
+  }
+
+  private compactSection(section: Section): Section {
+    const compacted: Section = {
+      id: section.id,
+      title: section.title,
+      summary: section.summary,
+      status: section.status,
+    };
+
+    if (section.actions && section.actions.length > 0) {
+      compacted.actions = section.actions;
+    }
+
+    if (section.decisions && section.decisions.length > 0) {
+      compacted.decisions = section.decisions;
+    }
+
+    if (section.questions && section.questions.length > 0) {
+      compacted.questions = section.questions;
+    }
+
+    return SectionSchema.parse(compacted);
+  }
+
+  private computeSummaryScore(summary: string, section: Section): number {
+    if (!summary || !section.summary) {
+      return 0;
+    }
+
+    if (summary === section.summary) {
+      return 1;
+    }
+
+    if (section.summary.includes(summary) || summary.includes(section.summary)) {
+      return 1;
+    }
+
+    if (section.title.includes(summary) || summary.includes(section.title)) {
+      return 0.9;
+    }
+
+    const summaryTokens = this.tokenize(summary);
+    const titleTokens = this.tokenize(section.title);
+    const sectionTokens = this.tokenize(section.summary);
+    const summaryNgrams = this.generateNgrams(summary);
+    const sectionNgrams = this.generateNgrams(section.summary);
+
+    const overlapWithSummary = this.computeOverlap(summaryTokens, sectionTokens);
+    const overlapWithTitle = this.computeOverlap(summaryTokens, titleTokens);
+    const overlapWithNgrams = this.computeOverlap(summaryNgrams, sectionNgrams);
+
+    return Math.max(overlapWithSummary, overlapWithTitle, overlapWithNgrams);
+  }
+
+  private computeTextScore(text: string, section: Section): number {
+    const tokensA = this.tokenize(text);
+    const tokensB = this.tokenize(`${section.title} ${section.summary}`);
+    const ngramsA = this.generateNgrams(text);
+    const ngramsB = this.generateNgrams(`${section.title} ${section.summary}`);
+    return Math.max(this.computeOverlap(tokensA, tokensB), this.computeOverlap(ngramsA, ngramsB));
+  }
+
+  private tokenize(text: string): string[] {
+    return text
+      .toLowerCase()
+      .split(/[^a-z0-9\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]+/u)
+      .filter(Boolean);
+  }
+
+  private generateNgrams(text: string, size = 2): string[] {
+    const normalized = text.replace(/\s+/g, "");
+    if (normalized.length <= size) {
+      return normalized ? [normalized] : [];
+    }
+
+    const ngrams: string[] = [];
+    for (let i = 0; i <= normalized.length - size; i++) {
+      ngrams.push(normalized.slice(i, i + size));
+    }
+    return ngrams;
+  }
+
+  private computeOverlap(tokensA: string[], tokensB: string[]): number {
+    if (tokensA.length === 0 || tokensB.length === 0) {
+      return 0;
+    }
+
+    const setA = new Set(tokensA);
+    const setB = new Set(tokensB);
+    let intersection = 0;
+    for (const token of setA) {
+      if (setB.has(token)) {
+        intersection += 1;
+      }
+    }
+
+    return intersection / Math.max(setA.size, setB.size);
+  }
+
+  private generateSectionId(summary: string, drafts: Map<string, SectionDraft>): string {
+    const base = summary
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-")
+      .slice(0, 40) || "topic";
+
+    let candidate = `sec_${base}`;
+    let suffix = 1;
+    while (drafts.has(candidate)) {
+      candidate = `sec_${base}_${suffix++}`;
+    }
+    return candidate;
+  }
+
+  private generateSectionTitle(summary: string): string {
+    const tokens = summary.split(/\s+/);
+    return tokens.slice(0, 6).join(" ");
+  }
 }

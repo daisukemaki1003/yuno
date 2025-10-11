@@ -1,42 +1,40 @@
-import { describe, it, expect } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 import {
+  CurrentSectionListSchema,
   Delta30sSchema,
   MinutesActionSchema,
-  SectionInputSchema,
-  SectionOutputSchema,
+  SectionSchema,
   SectionUpdateResponseSchema,
 } from "../../src/domain/minutes/index.js";
 
 describe("minutes domain schemas", () => {
   it("accepts a well-formed Delta30s payload", () => {
     const result = Delta30sSchema.parse({
-      summaries: ["公開最終版は来週水曜に確定"],
+      summaries: ["次回レビューで最終版を確定する"],
       actions: [
         {
-          task: "Figma 資料を最新化して共有",
-          owner: "",
-          due: null,
-          confidence: 0.9,
+          task: "レビュー資料をアップデートする",
+          owner: "佐藤",
+          due: "2025-10-12",
+          confidence: 0.8,
         },
       ],
       decisions: [
         {
-          what: "公開日を来週水曜に決定",
-          reason: "上申が承認されたため",
+          summary: "公開日は10/15で合意",
+          decider: "全員",
         },
       ],
       questions: [
         {
-          topic: "最終承認者の確認",
-          related_section_id: "sec_publish",
-          priority: "mid",
-          confidence: 0.42,
+          question: "法務レビューの担当は誰か?",
+          asked_by: "田中",
         },
       ],
     });
 
     expect(result.summaries).toHaveLength(1);
-    expect(result.actions[0].due).toBeNull();
+    expect(result.actions[0].task).toBe("レビュー資料をアップデートする");
   });
 
   it("rejects actions with invalid due date format", () => {
@@ -48,38 +46,37 @@ describe("minutes domain schemas", () => {
     ).toThrow("Invalid date format");
   });
 
-  it("enforces input and output section status enum boundaries", () => {
+  it("disallows closed sections inside CurrentSectionList", () => {
     expect(() =>
-      SectionInputSchema.parse({
-        id: "sec-1",
-        title: "公開スケジュール",
-        status: "closed",
-        bullets: ["タイムラインを整理"],
+      CurrentSectionListSchema.parse({
+        meeting_id: "mtg-1",
+        sections: [
+          {
+            id: "sec-1",
+            title: "公開スケジュール",
+            summary: "公開日を確定",
+            status: "closed",
+          },
+        ],
       })
     ).toThrow();
-
-    const output = SectionOutputSchema.parse({
-      id: "sec-1",
-      title: "公開スケジュール",
-      status: "closed",
-      bullets: ["タイムラインを整理"],
-      actions: [],
-    });
-
-    expect(output.status).toBe("closed");
   });
 
-  it("requires change summary arrays in SectionUpdateResponse", () => {
+  it("validates SectionUpdateResponse with optional lists", () => {
     const response = SectionUpdateResponseSchema.parse({
       meeting_id: "mtg-1",
       changed_sections: [
-        {
+        SectionSchema.parse({
           id: "sec-new",
           title: "新規タスク",
+          summary: "資料更新タスクを追加",
           status: "active",
-          bullets: ["メモを追加"],
-          actions: [],
-        },
+          actions: [
+            {
+              task: "資料更新",
+            },
+          ],
+        }),
       ],
       change_summary: {
         created_sections: ["sec-new"],
@@ -89,5 +86,6 @@ describe("minutes domain schemas", () => {
     });
 
     expect(response.change_summary.created_sections).toEqual(["sec-new"]);
+    expect(response.changed_sections[0].actions).toHaveLength(1);
   });
 });

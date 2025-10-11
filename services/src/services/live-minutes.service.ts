@@ -8,13 +8,13 @@ import {
   type Delta30s,
   type SectionUpdateResponse,
   type CurrentSectionList,
-  type SectionOutput,
-  type SectionInput,
+  type Section,
 } from "@/domain/minutes/index.js";
 import { transcriptEmitter } from "@/services/ws-relay.service.js";
 import { env } from "@/configs/env.js";
 import { Logger } from "@/utils/logger.js";
-import { SectionDiffEngine } from "@/services/section-diff.service.js";
+import { SectionDiffService } from "@/services/section-diff.service.js";
+import { minutesLogWriter } from "@/utils/minutes-log-writer.js";
 
 export type TranscriptChunk = {
   meetingId: string;
@@ -57,13 +57,13 @@ type MeetingState = {
   processing: boolean;
   nextCandidate: DigestCandidate | null;
   ttlTimer: NodeJS.Timeout | null;
-  sectionsSnapshot: SectionOutput[];
+  sectionsSnapshot: Section[];
 };
 
 const minutesLogger = new Logger("live-minutes");
 const liveMinutesEmitter = new EventEmitter();
 const meetingStates = new Map<string, MeetingState>();
-const sectionDiffEngine = new SectionDiffEngine();
+const sectionDiffService = new SectionDiffService();
 
 const WINDOW_MS = MINUTES_CONFIG.WINDOW_SEC * 1000;
 const EMIT_INTERVAL_MS = MINUTES_CONFIG.EMIT_INTERVAL_SEC * 1000;
@@ -371,6 +371,17 @@ async function generateSectionsWithRetry(
         windowEnd,
       });
 
+      const windowInfo = {
+        start: new Date(windowStart).toISOString(),
+        end: new Date(windowEnd).toISOString(),
+      };
+
+      minutesLogWriter.logDelta(meetingId, {
+        window: windowInfo,
+        delta,
+        digestHash: candidate.digestHash,
+      });
+
       const update = buildSectionUpdate(meetingId, state, delta);
       if (!update) {
         return null;
@@ -479,10 +490,18 @@ function buildSectionUpdate(
     meeting_id: meetingId,
     sections: state.sectionsSnapshot
       .filter((section) => section.status !== "closed")
-      .map((section) => cloneSectionInput(section)),
+      .map((section) => ({
+        id: section.id,
+        title: section.title,
+        summary: section.summary,
+        status: section.status === "provisional" ? "provisional" : "active",
+        actions: section.actions ? section.actions.map((action) => ({ ...action })) : undefined,
+        decisions: section.decisions ? section.decisions.map((decision) => ({ ...decision })) : undefined,
+        questions: section.questions ? section.questions.map((question) => ({ ...question })) : undefined,
+      })),
   };
 
-  const update = sectionDiffEngine.diff(currentSections, delta);
+  const update = sectionDiffService.diff(meetingId, delta, currentSections);
   if (update.changed_sections.length === 0) {
     minutesLogger.info("Section diff produced no changes", {
       meetingId,
@@ -491,33 +510,26 @@ function buildSectionUpdate(
   }
 
   applySectionUpdate(state, update);
+  minutesLogWriter.logSectionUpdate(meetingId, update);
   return update;
 }
 
-function cloneSectionOutput(section: SectionOutput): SectionOutput {
+function cloneSection(section: Section): Section {
   return {
     id: section.id,
     title: section.title,
+    summary: section.summary,
     status: section.status,
-    bullets: [...section.bullets],
-    actions: section.actions.map((action) => ({ ...action })),
-  };
-}
-
-function cloneSectionInput(section: SectionOutput): SectionInput {
-  return {
-    id: section.id,
-    title: section.title,
-    status: section.status === "closed" ? "provisional" : (section.status as SectionInput["status"]),
-    bullets: [...section.bullets],
-    actions: section.actions.map((action) => ({ ...action })),
+    actions: section.actions ? section.actions.map((action) => ({ ...action })) : undefined,
+    decisions: section.decisions ? section.decisions.map((decision) => ({ ...decision })) : undefined,
+    questions: section.questions ? section.questions.map((question) => ({ ...question })) : undefined,
   };
 }
 
 function applySectionUpdate(state: MeetingState, update: SectionUpdateResponse) {
-  const map = new Map<string, SectionOutput>();
+  const map = new Map<string, Section>();
   for (const section of state.sectionsSnapshot) {
-    map.set(section.id, cloneSectionOutput(section));
+    map.set(section.id, cloneSection(section));
   }
 
   for (const changed of update.changed_sections) {
@@ -526,7 +538,7 @@ function applySectionUpdate(state: MeetingState, update: SectionUpdateResponse) 
       continue;
     }
 
-    map.set(changed.id, cloneSectionOutput(changed));
+    map.set(changed.id, cloneSection(changed));
   }
 
   state.sectionsSnapshot = Array.from(map.values());
@@ -545,8 +557,8 @@ export async function generateDelta30sFromDigest(
     windowEnd: metadata.windowEnd,
     summaryCount: delta.summaries.length,
     actionCount: delta.actions.length,
-    decisionCount: delta.decisions?.length ?? 0,
-    questionCount: delta.questions?.length ?? 0,
+    decisionCount: delta.decisions.length,
+    questionCount: delta.questions.length,
   });
   return delta;
 }
