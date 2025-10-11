@@ -278,7 +278,7 @@ function handleGladiaMessage(session: RelaySession, data: WebSocket.Data) {
         timestamp: logTimestamp,
       });
 
-      minutesLogWriter.logTranscript(session.meetingId, {
+      minutesLogWriter.logTranscript(session.meetingId || "", {
         text: text || "",
         language: language || "unknown",
         isFinal,
