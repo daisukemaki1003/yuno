@@ -87,7 +87,6 @@ const DELTA_RESPONSE_SCHEMA = {
           confidence: { type: "number" },
         },
         required: ["task"],
-        additionalProperties: false,
       },
     },
     decisions: {
@@ -99,7 +98,6 @@ const DELTA_RESPONSE_SCHEMA = {
           reason: { type: "string" },
         },
         required: ["what", "reason"],
-        additionalProperties: false,
       },
     },
     questions: {
@@ -109,16 +107,14 @@ const DELTA_RESPONSE_SCHEMA = {
         properties: {
           topic: { type: "string" },
           related_section_id: { type: "string" },
-          priority: { enum: ["low", "mid", "high"] },
+          priority: { type: "string", enum: ["low", "mid", "high"] },
           confidence: { type: "number" },
         },
         required: ["topic"],
-        additionalProperties: false,
       },
     },
   },
   required: ["summaries", "actions"],
-  additionalProperties: false,
 };
 
 const PROMPT_TEMPLATE = `あなたは会議メモの確定版を作成するアシスタントです。直近30秒の会話ダイジェストを読み、以下の条件で JSON を出力してください。\n- summaries: 会話内の主要トピックを短い箇条書きで。1要約=1トピック、最大4件。\n- actions: 実行すべきタスク。可能であれば owner/due(YYYY-MM-DD)/confidence(0-1) を補完。\n- decisions: 明確に決まった事項があれば列挙。\n- questions: 未解決の論点や確認事項。priority は low/mid/high のいずれか。\n出力は JSON のみ。余計な説明を含めないでください。\n----\n{DIGEST}\n----`;

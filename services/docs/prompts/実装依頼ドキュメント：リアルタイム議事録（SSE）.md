@@ -234,16 +234,16 @@ const live = JSON.parse(jsonText) as LiveMinutes;
           "owner": { "type": "string" },
           "due": { "type": "string" }
         },
-        "required": ["text"],
-        "additionalProperties": false
+        "required": ["text"]
       },
       "maxItems": 3
     }
   },
-  "required": ["summary", "actions"],
-  "additionalProperties": false
+  "required": ["summary", "actions"]
 }
 ```
+
+> ※ Gemini の `responseSchema` API は `additionalProperties` を受け付けないため、余剰フィールドの検証は Zod 側（`Delta30sSchema`）で実施する。
 
 ### System（日本語・短く・厳しめ）
 
