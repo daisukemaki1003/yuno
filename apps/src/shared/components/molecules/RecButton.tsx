@@ -12,6 +12,7 @@ import {
 } from "@/shared/components/atoms/dialog";
 import {Input} from "@/shared/components/atoms/Input";
 import {Label} from "@/shared/components/atoms/label";
+import {createBot} from "@/shared/api/bots";
 
 interface RecButtonProps {
   isRecording: boolean;
@@ -30,9 +31,11 @@ const RecButton: React.FC<RecButtonProps> = ({
   const [meetUrl, setMeetUrl] = useState("");
   const [botName, setBotName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleDialogOpen = () => {
     if (!isRecording) {
+      setErrorMessage(null);
       setOpen(true);
     }
   };
@@ -44,25 +47,14 @@ const RecButton: React.FC<RecButtonProps> = ({
     }
 
     setIsSubmitting(true);
+    setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/meet/bot", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          meetingUrl: meetUrl,
-          botName: botName,
-        }),
+      const response = await createBot({
+        meetingUrl: meetUrl,
+        botName,
       });
-
-      if (!response.ok) {
-        throw new Error("ボットの追加に失敗しました");
-      }
-
-      const data = await response.json();
-      console.log("Bot added successfully:", data);
+      console.log("Bot added successfully:", response);
 
       setOpen(false);
       setMeetUrl("");
@@ -73,7 +65,7 @@ const RecButton: React.FC<RecButtonProps> = ({
       }
     } catch (error) {
       console.error("Error adding bot:", error);
-      alert("ボットの追加に失敗しました。もう一度お試しください。");
+      setErrorMessage("ボットの追加に失敗しました。もう一度お試しください。");
     } finally {
       setIsSubmitting(false);
     }
@@ -107,6 +99,7 @@ const RecButton: React.FC<RecButtonProps> = ({
         setBotName={setBotName}
         isSubmitting={isSubmitting}
         handleStartRecording={handleStartRecording}
+        errorMessage={errorMessage}
       />
     </>
   );
@@ -141,8 +134,19 @@ interface RecStartDialogProps {
   setBotName: (botName: string) => void;
   isSubmitting: boolean;
   handleStartRecording: () => void;
+  errorMessage: string | null;
 }
-const RecStartDialog = ({open, setOpen, meetUrl, setMeetUrl, botName, setBotName, isSubmitting, handleStartRecording}: RecStartDialogProps) => {
+const RecStartDialog = ({
+  open,
+  setOpen,
+  meetUrl,
+  setMeetUrl,
+  botName,
+  setBotName,
+  isSubmitting,
+  handleStartRecording,
+  errorMessage,
+}: RecStartDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-[425px]">
@@ -152,6 +156,11 @@ const RecStartDialog = ({open, setOpen, meetUrl, setMeetUrl, botName, setBotName
             Google MeetのURLとボット名を入力してください。
           </DialogDescription>
         </DialogHeader>
+        {errorMessage && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+            {errorMessage}
+          </div>
+        )}
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="meet-url" className="text-right">

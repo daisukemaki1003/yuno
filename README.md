@@ -92,7 +92,20 @@ NEXTAUTH_SECRET=
 
 # バックエンドAPI
 NEXT_PUBLIC_API_URL=http://localhost:8080
+# SSE 用のベース URL（未指定時は NEXT_PUBLIC_API_URL を利用）
+NEXT_PUBLIC_STREAM_BASE_URL=http://localhost:8080
+# デバッグ用モックレスポンスを有効化（未指定時は true）
+NEXT_PUBLIC_USE_API_MOCKS=true
+# クライアントからバックエンドへ送るヘッダー情報（必要に応じて設定）
+NEXT_PUBLIC_AUTH_BEARER=
+NEXT_PUBLIC_MEETING_BAAS_API_KEY=
+# バックエンドに渡す userId（任意）
+NEXT_PUBLIC_USER_ID=demo-user
+# タイムアウト（ms）
+NEXT_PUBLIC_API_TIMEOUT_MS=10000
 ```
+
+> 開発中に Hono サービスを起動せずに UI を確認したい場合は `NEXT_PUBLIC_USE_API_MOCKS=true` を指定してください。録音ボタン / 議事録ストリーム / 議事録一覧はすべてクライアント内のモックデータで動作します。実サービスに接続する場合は `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_STREAM_BASE_URL` をバックエンドの URL に変更し、必要に応じて `NEXT_PUBLIC_AUTH_BEARER` や `NEXT_PUBLIC_MEETING_BAAS_API_KEY` を設定して認証ヘッダーを付与してください。
 
 #### バックエンド (`services/.env`)
 

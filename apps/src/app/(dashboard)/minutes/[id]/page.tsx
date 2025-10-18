@@ -1,42 +1,37 @@
 "use client";
 
-import {useState} from "react";
+import {useMemo, useState} from "react";
 import {Button} from "@/shared/components/atoms/Button";
 import ReactMarkdown from "react-markdown";
 import "github-markdown-css";
 import "@/styles/github-markdown-override.css";
 import {FileOutput, SquarePenIcon} from "lucide-react";
 import {withAuth} from "@/shared/hooks/useAuth";
+import {useMeetingDetail} from "@/features/meetings/hooks/useMeetingDetail";
 
-function MinutesDetailPage() {
-  // 仮のデータ
-  const meeting = {
-    title: "2025年6月 営業戦略ミーティング",
-    date: "2025年6月5日（木） 14:00〜15:00",
-    category: "製品開発, UI/UX",
-    template: "営業会議テンプレート",
+interface MinutesDetailPageProps {
+  params: {
+    id: string;
   };
+}
 
-  // 議事録・文字起こしのモックデータ
-  const mockMinutes = `
-## 議題
-1. 前回の営業活動の振り返り\n2. 第2四半期の営業目標設定\n3. 新規顧客獲得戦略\n4. 営業チームの体制について
-
-### 1. 前回の営業活動の振り返り
-- 売上目標達成率: 95%（前年比+5%）
-- 新規顧客獲得数: 12社（目標15社）
-- 既存顧客からの追加受注: 8件（前年比+2件）
-`;
-  const mockTranscript = `
-（14:00）
-A: それでは営業戦略ミーティングを始めます。
-B: よろしくお願いします。まずは前回の営業活動の振り返りから。
-A: 売上目標達成率は95%でした。新規顧客は12社獲得できました。
-B: 目標には少し届きませんでしたが、既存顧客からの追加受注が増えています。
-（...省略...）
-`;
-
+function MinutesDetailPage({params}: MinutesDetailPageProps) {
   const [tab, setTab] = useState<"minutes" | "transcript">("minutes");
+  const {detail, loading, error} = useMeetingDetail(params.id);
+
+  const meeting = useMemo(
+    () =>
+      detail || {
+        id: params.id,
+        title: "議事録を読み込み中...",
+        date: "",
+        category: "",
+        templateName: "",
+        minutesMarkdown: "",
+        transcriptText: "",
+      },
+    [detail, params.id]
+  );
 
   return (
     <main className="min-h-screen px-8">
@@ -46,15 +41,19 @@ B: 目標には少し届きませんでしたが、既存顧客からの追加�
           <div>
             <h1 className="mb-2 text-3xl font-bold">{meeting.title}</h1>
             <div className="mb-1 text-sm text-gray-500">
-              <span className="mr-4">開催日時 {meeting.date}</span>
+              <span className="mr-4">
+                {meeting.date ? `開催日時 ${meeting.date}` : "開催日時を取得しています..."}
+              </span>
             </div>
             <div className="mb-1 text-sm text-gray-500">
-              <span className="mr-4">カテゴリ {meeting.category}</span>
+              <span className="mr-4">
+                {meeting.category ? `カテゴリ ${meeting.category}` : "カテゴリを取得しています..."}
+              </span>
             </div>
             <div className="text-xs text-gray-400">
               この議事録は「
               <span className="cursor-pointer text-blue-600 underline">
-                {meeting.template}
+                {meeting.templateName || "テンプレート情報読込中"}
               </span>
               」を元に作成されました
             </div>
@@ -88,13 +87,27 @@ B: 目標には少し届きませんでしたが、既存顧客からの追加�
           </button>
         </div>
         <div className="p-8">
-          {tab === "minutes" ? (
-            <div className="markdown-body">
-              <ReactMarkdown>{mockMinutes}</ReactMarkdown>
+          {loading && (
+            <div className="h-48 animate-pulse rounded-lg bg-gray-100" />
+          )}
+
+          {!loading && error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {error}
             </div>
-          ) : (
-            <pre className="text-sm whitespace-pre-wrap text-gray-800">
-              {mockTranscript}
+          )}
+
+          {!loading && !error && tab === "minutes" && (
+            <div className="markdown-body">
+              <ReactMarkdown>
+                {meeting.minutesMarkdown || "議事録のデータがまだありません。"}
+              </ReactMarkdown>
+            </div>
+          )}
+
+          {!loading && !error && tab === "transcript" && (
+            <pre className="whitespace-pre-wrap text-sm text-gray-800">
+              {meeting.transcriptText || "文字起こしのデータがまだありません。"}
             </pre>
           )}
         </div>

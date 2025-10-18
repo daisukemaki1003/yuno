@@ -23,6 +23,9 @@ interface PageConfig {
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null);
+  const [recordingTime, setRecordingTime] = useState("00:00:00");
   const pathname = usePathname();
   const router = useRouter();
   const {data: session} = useSession();
@@ -105,6 +108,35 @@ export default function Header() {
     };
   }, [showUserMenu]);
 
+  useEffect(() => {
+    if (!isRecording || !recordingStartedAt) {
+      setRecordingTime("00:00:00");
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - recordingStartedAt;
+      const totalSeconds = Math.max(0, Math.floor(elapsed / 1000));
+      const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+      const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+      const seconds = String(totalSeconds % 60).padStart(2, "0");
+      setRecordingTime(`${hours}:${minutes}:${seconds}`);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isRecording, recordingStartedAt]);
+
+  const handleRecordingToggle = () => {
+    if (isRecording) {
+      setIsRecording(false);
+      setRecordingStartedAt(null);
+      return;
+    }
+
+    setIsRecording(true);
+    setRecordingStartedAt(Date.now());
+  };
+
   return (
     <header
       className={cn(
@@ -134,7 +166,12 @@ export default function Header() {
             </Button>
           )}
 
-        <RecButton isRecording={false} recordingTime="00:42:18" />
+        <RecButton
+          isRecording={isRecording}
+          recordingTime={recordingTime}
+          onClick={handleRecordingToggle}
+          disabled={!session}
+        />
         {/* <RecButton isRecording={false} /> */}
 
         {/* ユーザーメニュー */}

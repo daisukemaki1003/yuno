@@ -21,65 +21,11 @@ import {
 import {Calendar, Search} from "lucide-react";
 import {Button} from "@/shared/components/atoms/Button";
 import Tag from "@/shared/components/atoms/Tag";
-
-const mockData = [
-  {
-    id: "1",
-    title: "Webアプリ開発キックオフ",
-    category: "ブレインストーミング",
-    description:
-      "Webアプリを新規で作成するためのミーティングです。プロジェクトの目標設定、技術スタック選定、チーム体制について議論しました。",
-    tags: ["開発", "コーポレートサイトリニューアル", "XXX株式会社"],
-    date: "2023/10/15",
-  },
-  {
-    id: "2",
-    title: "ダミーテキスト・ダミーテキスト・ダミーテキスト・ダミーテキスト",
-    category: "ダミーテキスト",
-    description:
-      "Webアプリを新規で作成するためのミーティングです。プロジェクトの目標設定、技術スタック選定、チーム体制について議論しました。",
-    tags: ["開発", "コーポレートサイトリニューアル", "XXX株式会社"],
-    date: "2023/10/15",
-  },
-  {
-    id: "3",
-    title: "Webアプリ開発キックオフ",
-    category: "ブレインストーミング",
-    description:
-      "Webアプリを新規で作成するためのミーティングです。プロジェクトの目標設定、技術スタック選定、チーム体制について議論しました。",
-    tags: ["開発", "コーポレートサイトリニューアル", "XXX株式会社"],
-    date: "2023/10/15",
-  },
-  {
-    id: "4",
-    title: "Webアプリ開発キックオフ",
-    category: "ブレインストーミング",
-    description:
-      "Webアプリを新規で作成するためのミーティングです。プロジェクトの目標設定、技術スタック選定、チーム体制について議論しました。",
-    tags: ["開発", "コーポレートサイトリニューアル", "XXX株式会社"],
-    date: "2023/10/15",
-  },
-  {
-    id: "5",
-    title: "Webアプリ開発キックオフ",
-    category: "ブレインストーミング",
-    description:
-      "Webアプリを新規で作成するためのミーティングです。プロジェクトの目標設定、技術スタック選定、チーム体制について議論しました。",
-    tags: ["開発", "コーポレートサイトリニューアル", "XXX株式会社"],
-    date: "2023/10/15",
-  },
-  {
-    id: "6",
-    title: "Webアプリ開発キックオフ",
-    category: "ブレインストーミング",
-    description:
-      "Webアプリを新規で作成するためのミーティングです。プロジェクトの目標設定、技術スタック選定、チーム体制について議論しました。",
-    tags: ["開発", "コーポレートサイトリニューアル", "XXX株式会社"],
-    date: "2023/10/15",
-  },
-];
+import {useMeetingsList} from "@/features/meetings/hooks/useMeetingsList";
 
 export default function HistoryPage() {
+  const {meetings, loading, error} = useMeetingsList();
+
   return (
     <main className="mx-auto px-8">
       <div className="mb-6 flex items-center space-x-4">
@@ -120,8 +66,30 @@ export default function HistoryPage() {
         </Select>
       </div>
 
+      {error && (
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {mockData.map((item) => (
+        {loading &&
+          Array.from({length: 4}).map((_, index) => (
+            <div
+              key={`skeleton-${index}`}
+              className="h-40 animate-pulse rounded-lg border bg-white"
+            >
+              <div className="h-full w-full rounded-lg bg-gray-100" />
+            </div>
+          ))}
+
+        {!loading && meetings.length === 0 && !error && (
+          <div className="col-span-1 rounded-lg border border-dashed bg-white p-6 text-center text-sm text-gray-500">
+            表示できる議事録がまだありません。
+          </div>
+        )}
+
+        {meetings.map((item) => (
           <Link key={item.id} href={`/minutes/${item.id}`}>
             <div className="rounded-lg border bg-white p-6 shadow-sm transition-all hover:shadow-md">
               <div className="flex items-start justify-between gap-2">
@@ -139,8 +107,8 @@ export default function HistoryPage() {
               <p className="mt-2 text-sm text-gray-600">{item.description}</p>
               <div className="mt-4 flex items-center justify-between">
                 <div className="flex flex-wrap gap-x-4 gap-y-2">
-                  {item.tags.map((tag, index) => (
-                    <Tag key={index}>{tag}</Tag>
+                  {item.tags.map((tag) => (
+                    <Tag key={`${item.id}-${tag}`}>{tag}</Tag>
                   ))}
                 </div>
                 <div className="flex flex-shrink-0 items-center text-xs text-gray-500">
